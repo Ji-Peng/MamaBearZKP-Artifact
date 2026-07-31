@@ -1,0 +1,187 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-29T11:39:01+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       zc,own pc,own df,own hp_df,own mem
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits  <- what the name PROV_QUERY128 refers to
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5  (falls ~1 bit per +1 nv)
+# fri-commit-thm: bad-folding-challenge count is O(n) per Ben-Sasson-Carmon-Haboeck-Kopparty-Saraf, STOC 2026, Thm 1.5 (proximity loss 0, explicit constant); supersedes the O(n^2) count of BCIKS FOCS 2020 + Haboeck 2022, which gave C=83.0 at nv=19 for MamaBear Ext3.  Caveat: STOC states the line case; the affine-space (batched) constant is to be confirmed against the full version.
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+# ---- provenance ----
+# The MamaBear row blocks below were measured by the run described in this
+# header. The Goldilocks and BabyBear blocks are carried over unchanged from
+# the 2026-07-27 capture on the same machine: this codebase has no
+# multithreaded Goldilocks/BabyBear prover, so those rows are single-threaded
+# and the parallel worker count cannot move them. They were left in place
+# rather than re-measured so the re-run could target only what changed.
+# A full ./reproduce_addmul.sh all regenerates every block in one capture.
+# ============================
+
+BabyBear prov128 Commit NV=18                                   642.390 ms
+BabyBear prov128 Open NV=18                                     520.643 ms
+BabyBear prov128 Commit NV=19                                  1374.825 ms
+BabyBear prov128 Open NV=19                                    1100.630 ms
+BabyBear prov128 Commit NV=20                                  2833.737 ms
+BabyBear prov128 Open NV=20                                    2466.400 ms
+BabyBear prov128 Commit NV=21                                  5840.298 ms
+BabyBear prov128 Open NV=21                                    4964.909 ms
+BabyBear prov128 Commit NV=22                                 11940.252 ms
+BabyBear prov128 Open NV=22                                   10206.448 ms
+BabyBear prov128 Commit NV=23                                 24380.032 ms
+BabyBear prov128 Open NV=23                                   20464.556 ms
+BabyBear prov128 Commit NV=24                                 49797.993 ms
+BabyBear prov128 Open NV=24                                   40883.571 ms
+
+Goldilocks prov128 Commit NV=18                                 649.767 ms
+Goldilocks prov128 Open NV=18                                   593.468 ms
+Goldilocks prov128 Commit NV=19                                1463.664 ms
+Goldilocks prov128 Open NV=19                                  1268.228 ms
+Goldilocks prov128 Commit NV=20                                2926.918 ms
+Goldilocks prov128 Open NV=20                                  2700.118 ms
+Goldilocks prov128 Commit NV=21                                6079.346 ms
+Goldilocks prov128 Open NV=21                                  5474.305 ms
+Goldilocks prov128 Commit NV=22                               12232.783 ms
+Goldilocks prov128 Open NV=22                                 11196.163 ms
+Goldilocks prov128 Commit NV=23                               24820.543 ms
+Goldilocks prov128 Open NV=23                                 22492.949 ms
+Goldilocks prov128 Commit NV=24                               50322.077 ms
+Goldilocks prov128 Open NV=24                                 45213.070 ms
+
+Ext3 prov128 Commit NV=18 split=3                                58.811 ms
+Ext3 prov128 Open NV=18 split=3                                  38.633 ms
+Ext3 prov128 Commit NV=19 split=3                               129.922 ms
+Ext3 prov128 Open NV=19 split=3                                  77.428 ms
+Ext3 prov128 Commit NV=20 split=3                               482.237 ms
+Ext3 prov128 Open NV=20 split=3                                 163.631 ms
+Ext3 prov128 Commit NV=21 split=3                               752.148 ms
+Ext3 prov128 Open NV=21 split=3                                 330.286 ms
+Ext3 prov128 Commit NV=22 split=3                              1687.196 ms
+Ext3 prov128 Open NV=22 split=3                                 773.460 ms
+Ext3 prov128 Commit NV=23 split=3                              4099.406 ms
+Ext3 prov128 Open NV=23 split=3                                1606.580 ms
+Ext3 prov128 Commit NV=24 split=3                              9714.065 ms
+Ext3 prov128 Open NV=24 split=3                                3321.883 ms
+Ext3 prov128 Commit NV=25 split=3                             21922.709 ms
+Ext3 prov128 Open NV=25 split=3                                6926.573 ms
+Ext3 prov128 Commit NV=26 split=3                             53106.569 ms
+Ext3 prov128 Open NV=26 split=3                               14331.176 ms
+Ext3 prov128 Commit NV=27 split=3                            109834.229 ms
+Ext3 prov128 Open NV=27 split=3                               28539.411 ms
+Ext3 prov128 Commit Par NV=18 split=3                            11.107 ms
+Ext3 prov128 Open Par NV=18 split=3                              25.806 ms
+Ext3 prov128 Commit Par NV=19 split=3                            28.270 ms
+Ext3 prov128 Open Par NV=19 split=3                              41.896 ms
+Ext3 prov128 Commit Par NV=20 split=3                            67.019 ms
+Ext3 prov128 Open Par NV=20 split=3                              85.373 ms
+Ext3 prov128 Commit Par NV=21 split=3                           161.640 ms
+Ext3 prov128 Open Par NV=21 split=3                             151.311 ms
+Ext3 prov128 Commit Par NV=22 split=3                           366.467 ms
+Ext3 prov128 Open Par NV=22 split=3                             308.212 ms
+Ext3 prov128 Commit Par NV=23 split=3                           804.820 ms
+Ext3 prov128 Open Par NV=23 split=3                             640.517 ms
+Ext3 prov128 Commit Par NV=24 split=3                          1906.898 ms
+Ext3 prov128 Open Par NV=24 split=3                            1282.865 ms
+Ext3 prov128 Commit Par NV=25 split=3                          4894.997 ms
+Ext3 prov128 Open Par NV=25 split=3                            2594.290 ms
+Ext3 prov128 Commit Par NV=26 split=3                         11107.615 ms
+Ext3 prov128 Open Par NV=26 split=3                            5297.688 ms
+Ext3 prov128 Commit Par NV=27 split=3                         25099.179 ms
+
+Ext3 prov128 Commit NV=18 split=4                                48.520 ms
+Ext3 prov128 Open NV=18 split=4                                  33.774 ms
+Ext3 prov128 Commit NV=19 split=4                               110.848 ms
+Ext3 prov128 Open NV=19 split=4                                  66.435 ms
+Ext3 prov128 Commit NV=20 split=4                               250.405 ms
+Ext3 prov128 Open NV=20 split=4                                 139.243 ms
+Ext3 prov128 Commit NV=21 split=4                               587.231 ms
+Ext3 prov128 Open NV=21 split=4                                 283.337 ms
+Ext3 prov128 Commit NV=22 split=4                              1489.799 ms
+Ext3 prov128 Open NV=22 split=4                                 559.900 ms
+Ext3 prov128 Commit NV=23 split=4                              3433.795 ms
+Ext3 prov128 Open NV=23 split=4                                1344.728 ms
+Ext3 prov128 Commit NV=24 split=4                              8230.054 ms
+Ext3 prov128 Open NV=24 split=4                                2783.596 ms
+Ext3 prov128 Commit NV=25 split=4                             19498.103 ms
+Ext3 prov128 Open NV=25 split=4                                5883.342 ms
+Ext3 prov128 Commit NV=26 split=4                             44722.578 ms
+Ext3 prov128 Open NV=26 split=4                               12065.874 ms
+Ext3 prov128 Commit NV=27 split=4                            101754.489 ms
+Ext3 prov128 Open NV=27 split=4                               24085.556 ms
+Ext3 prov128 Commit Par NV=18 split=4                             9.293 ms
+Ext3 prov128 Open Par NV=18 split=4                              20.834 ms
+Ext3 prov128 Commit Par NV=19 split=4                            19.711 ms
+Ext3 prov128 Open Par NV=19 split=4                              38.315 ms
+Ext3 prov128 Commit Par NV=20 split=4                            56.853 ms
+Ext3 prov128 Open Par NV=20 split=4                              69.952 ms
+Ext3 prov128 Commit Par NV=21 split=4                           219.635 ms
+Ext3 prov128 Open Par NV=21 split=4                             133.705 ms
+Ext3 prov128 Commit Par NV=22 split=4                           276.998 ms
+Ext3 prov128 Open Par NV=22 split=4                             265.504 ms
+Ext3 prov128 Commit Par NV=23 split=4                           621.347 ms
+Ext3 prov128 Open Par NV=23 split=4                             542.113 ms
+Ext3 prov128 Commit Par NV=24 split=4                          1532.767 ms
+Ext3 prov128 Open Par NV=24 split=4                            1083.290 ms
+Ext3 prov128 Commit Par NV=25 split=4                          3646.493 ms
+Ext3 prov128 Open Par NV=25 split=4                            2222.115 ms
+Ext3 prov128 Commit Par NV=26 split=4                          9264.511 ms
+Ext3 prov128 Open Par NV=26 split=4                            4521.174 ms
+Ext3 prov128 Commit Par NV=27 split=4                         21683.195 ms
+Ext3 prov128 Open Par NV=27 split=4                            9046.301 ms
+
+Ext3 prov128 Commit NV=18 split=5                                45.082 ms
+Ext3 prov128 Open NV=18 split=5                                  31.523 ms
+Ext3 prov128 Commit NV=19 split=5                               103.511 ms
+Ext3 prov128 Open NV=19 split=5                                  63.930 ms
+Ext3 prov128 Commit NV=20 split=5                               226.455 ms
+Ext3 prov128 Open NV=20 split=5                                 125.939 ms
+Ext3 prov128 Commit NV=21 split=5                               505.455 ms
+Ext3 prov128 Open NV=21 split=5                                 268.110 ms
+Ext3 prov128 Commit NV=22 split=5                              1194.757 ms
+Ext3 prov128 Open NV=22 split=5                                 583.821 ms
+Ext3 prov128 Commit NV=23 split=5                              3188.210 ms
+Ext3 prov128 Open NV=23 split=5                                1169.525 ms
+Ext3 prov128 Commit NV=24 split=5                              7500.158 ms
+Ext3 prov128 Open NV=24 split=5                                2539.425 ms
+Ext3 prov128 Commit NV=25 split=5                             17009.041 ms
+Ext3 prov128 Open NV=25 split=5                                5393.808 ms
+Ext3 prov128 Commit NV=26 split=5                             40029.682 ms
+Ext3 prov128 Open NV=26 split=5                               11105.969 ms
+Ext3 prov128 Commit NV=27 split=5                             92344.819 ms
+Ext3 prov128 Open NV=27 split=5                               22379.314 ms
+Ext3 prov128 Commit Par NV=18 split=5                             8.596 ms
+Ext3 prov128 Open Par NV=18 split=5                              17.729 ms
+Ext3 prov128 Commit Par NV=19 split=5                            18.134 ms
+Ext3 prov128 Open Par NV=19 split=5                              34.529 ms
+Ext3 prov128 Commit Par NV=20 split=5                            40.164 ms
+Ext3 prov128 Open Par NV=20 split=5                              68.791 ms
+Ext3 prov128 Commit Par NV=21 split=5                           101.434 ms
+Ext3 prov128 Open Par NV=21 split=5                             131.119 ms
+Ext3 prov128 Commit Par NV=22 split=5                           232.123 ms
+Ext3 prov128 Open Par NV=22 split=5                             246.982 ms
+Ext3 prov128 Commit Par NV=23 split=5                           527.070 ms
+Ext3 prov128 Open Par NV=23 split=5                             501.047 ms
+Ext3 prov128 Commit Par NV=24 split=5                          1181.636 ms
+Ext3 prov128 Open Par NV=24 split=5                            1009.227 ms
+Ext3 prov128 Commit Par NV=25 split=5                          2953.404 ms
+Ext3 prov128 Open Par NV=25 split=5                            2095.936 ms
+Ext3 prov128 Commit Par NV=26 split=5                          7182.870 ms
+Ext3 prov128 Open Par NV=26 split=5                            4158.921 ms
+Ext3 prov128 Commit Par NV=27 split=5                         17808.104 ms
+Ext3 prov128 Open Par NV=27 split=5                            8374.889 ms

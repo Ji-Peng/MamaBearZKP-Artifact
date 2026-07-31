@@ -1,0 +1,26 @@
+/target
+/external/
+__pycache__/
+*.pyc
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.synctex.gz
+*.toc
+*.xdv
+*.loa
+*.lol
+*.nav
+*.snm
+*.vrb
+
+# Backup copies of shipped result files, written by the reproduce scripts
+# before they regenerate a file, so the committed measurement can be diffed
+# against the fresh one.
+*.committed

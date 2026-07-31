@@ -1,0 +1,380 @@
+diff --git a/examples/Cargo.toml b/examples/Cargo.toml
+index f224233a..4a8d5c33 100644
+--- a/examples/Cargo.toml
++++ b/examples/Cargo.toml
+@@ -31,9 +31,25 @@ p3-symmetric.workspace = true
+ p3-uni-stark.workspace = true
+ 
+ clap.workspace = true
++peak_alloc = { version = "0.3", optional = true }
+ postcard = { workspace = true, features = ["alloc"] }
+ rand.workspace = true
+ 
++[features]
++# Forward the `parallel` feature to every direct dep that exposes one.
++# Mirrors how `p3-maybe-rayon/parallel` is wired through the workspace.
++parallel = [
++    "p3-blake3-air/parallel",
++    "p3-dft/parallel",
++    "p3-keccak-air/parallel",
++    "p3-poseidon2-air/parallel",
++    "p3-uni-stark/parallel",
++]
++# Enable the peak-heap allocator (peak_alloc::PeakAlloc) as #[global_allocator].
++# Used by reproduce_plonky3.sh for the peak-memory benchmark sweep. Keep this
++# off for timing runs so allocator bookkeeping does not perturb numbers.
++measure-peak = ["dep:peak_alloc"]
++
+ [dev-dependencies]
+ p3-baby-bear = { path = "../baby-bear" }
+ p3-challenger = { path = "../challenger" }
+diff --git a/examples/examples/prove_prime_field_31.rs b/examples/examples/prove_prime_field_31.rs
+index 55cccfa4..1133f222 100644
+--- a/examples/examples/prove_prime_field_31.rs
++++ b/examples/examples/prove_prime_field_31.rs
+@@ -7,7 +7,13 @@ use p3_blake3_air::Blake3Air;
+ use p3_dft::Radix2DitParallel;
+ use p3_examples::airs::ProofObjective;
+ use p3_examples::dfts::DftChoice;
+-use p3_examples::parsers::{DftOptions, FieldOptions, MerkleHashOptions, ProofOptions};
++use p3_examples::parsers::{
++    DftOptions, FieldOptions, MerkleHashOptions, ProofOptions, SecurityOptions,
++};
++
++#[cfg(feature = "measure-peak")]
++#[global_allocator]
++static GLOBAL: peak_alloc::PeakAlloc = peak_alloc::PeakAlloc;
+ use p3_examples::proofs::{
+     prove_m31_keccak, prove_m31_poseidon2, prove_monty31_keccak, prove_monty31_poseidon2,
+     report_result,
+@@ -60,6 +66,10 @@ struct Args {
+     /// The hash function to use when assembling the Merkle tree.
+     #[arg(short, long, ignore_case = true, value_enum)]
+     merkle_hash: MerkleHashOptions,
++
++    /// FRI security preset (conj96 / prov97 / prov128).
++    #[arg(short, long, ignore_case = true, value_enum, default_value_t = SecurityOptions::Conj96)]
++    security: SecurityOptions,
+ }
+ 
+ fn main() {
+@@ -143,7 +153,12 @@ fn main() {
+ 
+             match args.merkle_hash {
+                 MerkleHashOptions::KeccakF => {
+-                    let result = prove_monty31_keccak::<_, EF, _, _>(&proof_goal, dft, num_hashes);
++                    let result = prove_monty31_keccak::<_, EF, _, _>(
++                        &proof_goal,
++                        dft,
++                        num_hashes,
++                        args.security,
++                    );
+                     report_result(result);
+                 }
+                 MerkleHashOptions::Poseidon2 => {
+@@ -155,6 +170,7 @@ fn main() {
+                         num_hashes,
+                         perm16,
+                         perm24,
++                        args.security,
+                     );
+                     report_result(result);
+                 }
+@@ -203,7 +219,12 @@ fn main() {
+ 
+             match args.merkle_hash {
+                 MerkleHashOptions::KeccakF => {
+-                    let result = prove_monty31_keccak::<_, EF, _, _>(&proof_goal, dft, num_hashes);
++                    let result = prove_monty31_keccak::<_, EF, _, _>(
++                        &proof_goal,
++                        dft,
++                        num_hashes,
++                        args.security,
++                    );
+                     report_result(result);
+                 }
+                 MerkleHashOptions::Poseidon2 => {
+@@ -215,6 +236,7 @@ fn main() {
+                         num_hashes,
+                         perm16,
+                         perm24,
++                        args.security,
+                     );
+                     report_result(result);
+                 }
+diff --git a/examples/src/lib.rs b/examples/src/lib.rs
+index 03425ebe..e5b55e0b 100644
+--- a/examples/src/lib.rs
++++ b/examples/src/lib.rs
+@@ -4,5 +4,11 @@ pub mod parsers;
+ pub mod proofs;
+ pub mod types;
+ 
++/// Peak-allocator handle used by the `measure-peak` benchmark feature.
++/// The binary crate registers `PEAK_ALLOC` as `#[global_allocator]` under
++/// the same feature flag; `proofs::report_peak_memory` reads from it.
++#[cfg(feature = "measure-peak")]
++pub static PEAK_ALLOC: peak_alloc::PeakAlloc = peak_alloc::PeakAlloc;
++
+ #[cfg(test)]
+ mod tests;
+diff --git a/examples/src/parsers.rs b/examples/src/parsers.rs
+index 183f244c..9863b8ce 100644
+--- a/examples/src/parsers.rs
++++ b/examples/src/parsers.rs
+@@ -36,6 +36,15 @@ pub enum MerkleHashOptions {
+     Poseidon2,
+ }
+ 
++/// FRI security preset selected at the CLI. Mirrors the three levels
++/// used by the DeepFold-HyperPlonk-SIMD benchmark suite.
++#[derive(Debug, Copy, Clone, PartialEq, Eq)]
++pub enum SecurityOptions {
++    Conj96,
++    Prov97,
++    Prov128,
++}
++
+ /// Produce a collection of PossibleValue's for an Enum variant.
+ ///
+ /// We allow any prefix of the full name which uniquely determines the variant.
+@@ -156,3 +165,17 @@ impl ValueEnum for MerkleHashOptions {
+         })
+     }
+ }
++
++impl ValueEnum for SecurityOptions {
++    fn value_variants<'a>() -> &'a [Self] {
++        &[Self::Conj96, Self::Prov97, Self::Prov128]
++    }
++
++    fn to_possible_value(&self) -> Option<PossibleValue> {
++        Some(match self {
++            Self::Conj96 => PossibleValue::new("conj96"),
++            Self::Prov97 => PossibleValue::new("prov97"),
++            Self::Prov128 => PossibleValue::new("prov128"),
++        })
++    }
++}
+diff --git a/examples/src/proofs.rs b/examples/src/proofs.rs
+index 5aec2f12..90b69b7a 100644
+--- a/examples/src/proofs.rs
++++ b/examples/src/proofs.rs
+@@ -1,4 +1,5 @@
+ use core::fmt::Debug;
++use std::time::Instant;
+ 
+ use p3_challenger::{DuplexChallenger, SerializingChallenger32};
+ use p3_circle::CirclePcs;
+@@ -15,12 +16,63 @@ use rand::distr::StandardUniform;
+ use rand::prelude::Distribution;
+ 
+ use crate::airs::ExampleHashAir;
++use crate::parsers::SecurityOptions;
+ use crate::types::{
+     KeccakCircleStarkConfig, KeccakCompressionFunction, KeccakMerkleMmcs, KeccakStarkConfig,
+     Poseidon2CircleStarkConfig, Poseidon2Compression, Poseidon2MerkleMmcs, Poseidon2Sponge,
+     Poseidon2StarkConfig,
+ };
+ 
++/// Build `FriParameters` at one of the three DeepFold-comparison presets.
++/// All three use log_blowup = 3 and binary folding (max_log_arity = 1).
++#[inline]
++fn fri_params_for_security<M>(security: SecurityOptions, mmcs: M) -> FriParameters<M> {
++    match security {
++        SecurityOptions::Conj96 => FriParameters::new_benchmark_conj96(mmcs),
++        SecurityOptions::Prov97 => FriParameters::new_benchmark_prov97(mmcs),
++        SecurityOptions::Prov128 => FriParameters::new_benchmark_prov128(mmcs),
++    }
++}
++
++#[inline]
++fn env_usize(key: &str, default: usize) -> usize {
++    std::env::var(key)
++        .ok()
++        .and_then(|s| s.parse().ok())
++        .unwrap_or(default)
++}
++
++/// Run `produce_proof` with `BENCH_WARMUP` un-timed warmups followed by
++/// `BENCH_SAMPLES` timed samples, all inside a single process so caches
++/// and the allocator are genuinely primed across iterations. Returns the
++/// median sample time (ms) and the final proof. Also resets the peak-heap
++/// tracker after warmup so `PLONKY3_PEAK_BYTES` reflects only measured
++/// runs.
++fn bench_prove<T>(mut produce_proof: impl FnMut() -> T) -> (f64, T) {
++    let warmup = env_usize("BENCH_WARMUP", 1);
++    let samples = env_usize("BENCH_SAMPLES", 5).max(1);
++
++    for _ in 0..warmup {
++        let _ = produce_proof();
++    }
++
++    #[cfg(feature = "measure-peak")]
++    crate::PEAK_ALLOC.reset_peak_usage();
++
++    let mut times_ms: Vec<f64> = Vec::with_capacity(samples);
++    let mut last: Option<T> = None;
++    for _ in 0..samples {
++        let t0 = Instant::now();
++        let result = produce_proof();
++        let elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0;
++        times_ms.push(elapsed_ms);
++        last = Some(result);
++    }
++    times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
++    let median_ms = times_ms[times_ms.len() / 2];
++    (median_ms, last.expect("samples >= 1"))
++}
++
+ /// Result type for Keccak-based two-adic proofs
+ type KeccakTwoAdicResult<F, EF, DFT> =
+     Result<(), VerificationError<PcsError<KeccakStarkConfig<F, EF, DFT>>>>;
+@@ -89,6 +141,7 @@ pub fn prove_monty31_keccak<
+     proof_goal: &PG,
+     dft: DFT,
+     num_hashes: usize,
++    security: SecurityOptions,
+ ) -> KeccakTwoAdicResult<F, EF, DFT>
+ where
+     StandardUniform: Distribution<F>,
+@@ -96,17 +149,22 @@ where
+     let val_mmcs = get_keccak_mmcs(3);
+ 
+     let challenge_mmcs = ExtensionMmcs::<F, EF, _>::new(val_mmcs.clone());
+-    let fri_params = FriParameters::new_benchmark_high_arity(challenge_mmcs);
+-
+-    let trace = proof_goal.generate_trace_rows(num_hashes, fri_params.log_blowup);
++    let fri_params = fri_params_for_security(security, challenge_mmcs);
++    let log_blowup = fri_params.log_blowup;
+ 
+     let pcs = TwoAdicFriPcs::new(dft, val_mmcs, fri_params);
+     let challenger = SerializingChallenger32::from_hasher(vec![], Keccak256Hash {});
+ 
+     let config = KeccakStarkConfig::new(pcs, challenger);
+ 
+-    let proof = prove(&config, proof_goal, trace, &[]);
++    let (median_ms, proof) = bench_prove(|| {
++        let trace = proof_goal.generate_trace_rows(num_hashes, log_blowup);
++        prove(&config, proof_goal, trace, &[])
++    });
++
++    println!("PLONKY3_PROVE_MS: {median_ms:.3}");
+     report_proof_size(&proof);
++    report_peak_memory();
+ 
+     verify(&config, proof_goal, &proof, &[])
+ }
+@@ -131,6 +189,7 @@ pub fn prove_monty31_poseidon2<
+     num_hashes: usize,
+     perm16: Perm16,
+     perm24: Perm24,
++    security: SecurityOptions,
+ ) -> Poseidon2TwoAdicResult<F, EF, DFT, Perm16, Perm24>
+ where
+     StandardUniform: Distribution<F>,
+@@ -138,17 +197,22 @@ where
+     let val_mmcs = get_poseidon2_mmcs::<F, _, _>(perm16, perm24.clone(), 3);
+ 
+     let challenge_mmcs = ExtensionMmcs::<F, EF, _>::new(val_mmcs.clone());
+-    let fri_params = FriParameters::new_benchmark_high_arity(challenge_mmcs);
+-
+-    let trace = proof_goal.generate_trace_rows(num_hashes, fri_params.log_blowup);
++    let fri_params = fri_params_for_security(security, challenge_mmcs);
++    let log_blowup = fri_params.log_blowup;
+ 
+     let pcs = TwoAdicFriPcs::new(dft, val_mmcs, fri_params);
+     let challenger = DuplexChallenger::new(perm24);
+ 
+     let config = Poseidon2StarkConfig::new(pcs, challenger);
+ 
+-    let proof = prove(&config, proof_goal, trace, &[]);
++    let (median_ms, proof) = bench_prove(|| {
++        let trace = proof_goal.generate_trace_rows(num_hashes, log_blowup);
++        prove(&config, proof_goal, trace, &[])
++    });
++
++    println!("PLONKY3_PROVE_MS: {median_ms:.3}");
+     report_proof_size(&proof);
++    report_peak_memory();
+ 
+     verify(&config, proof_goal, &proof, &[])
+ }
+@@ -253,5 +317,17 @@ where
+     SC: StarkGenericConfig,
+ {
+     let proof_bytes = postcard::to_allocvec(proof).expect("Failed to serialize proof");
+-    println!("Proof size: {} bytes", proof_bytes.len());
++    let len = proof_bytes.len();
++    println!("Proof size: {len} bytes");
++    println!("PLONKY3_PROOF_BYTES: {len}");
++}
++
++/// Report peak heap memory when `measure-peak` is on.
++#[inline]
++pub fn report_peak_memory() {
++    #[cfg(feature = "measure-peak")]
++    {
++        let peak = crate::PEAK_ALLOC.peak_usage();
++        println!("PLONKY3_PEAK_BYTES: {peak}");
++    }
+ }
+diff --git a/fri/src/config.rs b/fri/src/config.rs
+index bc18cbd2..23449495 100644
+--- a/fri/src/config.rs
++++ b/fri/src/config.rs
+@@ -112,6 +112,54 @@ impl<M> FriParameters<M> {
+             mmcs,
+         }
+     }
++
++    // ---------------------------------------------------------------------
++    // DeepFold-HyperPlonk-SIMD benchmark presets (log_blowup = 3).
++    //
++    // Matches the FRI configurations used by the MamaBear / BabyBear
++    // DeepFold benchmarks so Plonky3 numbers are directly comparable.
++    // All three presets use binary folding (max_log_arity = 1) and
++    // log_final_poly_len = 0.
++    // ---------------------------------------------------------------------
++
++    /// conj96: conjecture-based query soundness ≈ 96 bits (3 * 36 - 12).
++    pub const fn new_benchmark_conj96(mmcs: M) -> Self {
++        Self {
++            log_blowup: 3,
++            log_final_poly_len: 0,
++            max_log_arity: 1,
++            num_queries: 36,
++            commit_proof_of_work_bits: 0,
++            query_proof_of_work_bits: 0,
++            mmcs,
++        }
++    }
++
++    /// prov97: provable query security ≈ 97 bits.
++    pub const fn new_benchmark_prov97(mmcs: M) -> Self {
++        Self {
++            log_blowup: 3,
++            log_final_poly_len: 0,
++            max_log_arity: 1,
++            num_queries: 76,
++            commit_proof_of_work_bits: 0,
++            query_proof_of_work_bits: 0,
++            mmcs,
++        }
++    }
++
++    /// prov128: provable query security = 128 bits (88 queries + 16-bit PoW).
++    pub const fn new_benchmark_prov128(mmcs: M) -> Self {
++        Self {
++            log_blowup: 3,
++            log_final_poly_len: 0,
++            max_log_arity: 1,
++            num_queries: 88,
++            commit_proof_of_work_bits: 0,
++            query_proof_of_work_bits: 16,
++            mmcs,
++        }
++    }
+ }
+ 
+ /// Whereas `FriParameters` encompasses parameters the end user can set, `FriFoldingStrategy` is

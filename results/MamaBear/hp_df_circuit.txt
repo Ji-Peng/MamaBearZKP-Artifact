@@ -1,0 +1,185 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-31T18:03:25+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       field grind circuit size
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+=== circuit_size (sha256) ===
+For SHA256: 1 block corresponds to 301,634 (2^18.20) gates.
+
+SHA256 circuit: circuit size 2^nv vs number of SHA-256 compression blocks
+  nv |               2^nv |        #blocks
+-----+--------------------+----------------
+  16 |             65,536 |              0
+  17 |            131,072 |              0
+  18 |            262,144 |              0
+  19 |            524,288 |              1
+  20 |          1,048,576 |              3
+  21 |          2,097,152 |              6
+  22 |          4,194,304 |             13
+  23 |          8,388,608 |             27
+  24 |         16,777,216 |             55
+  25 |         33,554,432 |            111
+  26 |         67,108,864 |            222
+  27 |        134,217,728 |            444
+  28 |        268,435,456 |            889
+
+=== circuit_size (aes128) ===
+For AES128: 1 call corresponds to 87,915 (2^16.42) gates.
+
+AES128 circuit: circuit size 2^nv vs number of AES-128 encryption calls
+  nv |               2^nv |         #calls
+-----+--------------------+----------------
+  16 |             65,536 |              0
+  17 |            131,072 |              1
+  18 |            262,144 |              2
+  19 |            524,288 |              5
+  20 |          1,048,576 |             11
+  21 |          2,097,152 |             23
+  22 |          4,194,304 |             47
+  23 |          8,388,608 |             95
+  24 |         16,777,216 |            190
+  25 |         33,554,432 |            381
+  26 |         67,108,864 |            763
+  27 |        134,217,728 |          1,526
+  28 |        268,435,456 |          3,053
+
+=== circuit_size (blake3) ===
+For Blake3: 1 Blake3 permutation corresponds to 149,378 (2^17.19) gates.
+
+Blake3 circuit: circuit size 2^nv vs number of BLAKE3 permutations
+  nv |               2^nv |  #permutations
+-----+--------------------+----------------
+  16 |             65,536 |              0
+  17 |            131,072 |              0
+  18 |            262,144 |              1
+  19 |            524,288 |              3
+  20 |          1,048,576 |              7
+  21 |          2,097,152 |             14
+  22 |          4,194,304 |             28
+  23 |          8,388,608 |             56
+  24 |         16,777,216 |            112
+  25 |         33,554,432 |            224
+  26 |         67,108,864 |            449
+  27 |        134,217,728 |            898
+  28 |        268,435,456 |          1,797
+
+=== circuit_size (keccakf) ===
+For Keccak-f[1600]: 1 Keccak-f[1600] permutation corresponds to 584,089 (2^19.16) gates.
+
+Keccak-f[1600] circuit: circuit size 2^nv vs number of permutations
+  nv |               2^nv |  #permutations
+-----+--------------------+----------------
+  16 |             65,536 |              0
+  17 |            131,072 |              0
+  18 |            262,144 |              0
+  19 |            524,288 |              0
+  20 |          1,048,576 |              1
+  21 |          2,097,152 |              3
+  22 |          4,194,304 |              7
+  23 |          8,388,608 |             14
+  24 |         16,777,216 |             28
+  25 |         33,554,432 |             57
+  26 |         67,108,864 |            114
+  27 |        134,217,728 |            229
+  28 |        268,435,456 |            459
+
+=== circuit_size (poseidon2_x11) ===
+For Poseidon2 (uniform x^11): 1 Poseidon2 permutation corresponds to 5,321 (2^12.38) gates.
+
+Poseidon2 x^11 circuit (width 16, uniform S-box): circuit size 2^nv vs number of permutations
+  nv |               2^nv |  #permutations
+-----+--------------------+----------------
+  16 |             65,536 |             12
+  17 |            131,072 |             24
+  18 |            262,144 |             49
+  19 |            524,288 |             98
+  20 |          1,048,576 |            197
+  21 |          2,097,152 |            394
+  22 |          4,194,304 |            788
+  23 |          8,388,608 |          1,576
+  24 |         16,777,216 |          3,153
+  25 |         33,554,432 |          6,306
+  26 |         67,108,864 |         12,612
+  27 |        134,217,728 |         25,224
+  28 |        268,435,456 |         50,448
+
+=== circuit_size (poseidon2_native_mamabear) ===
+For Poseidon2 (MamaBear native, x^5): 1 Poseidon2 permutation corresponds to 4,757 (2^12.22) gates.
+
+Poseidon2 native MamaBear circuit (width 16, x^5 S-box): circuit size 2^nv vs number of permutations
+  nv |               2^nv |  #permutations
+-----+--------------------+----------------
+  16 |             65,536 |             13
+  17 |            131,072 |             27
+  18 |            262,144 |             55
+  19 |            524,288 |            110
+  20 |          1,048,576 |            220
+  21 |          2,097,152 |            440
+  22 |          4,194,304 |            881
+  23 |          8,388,608 |          1,763
+  24 |         16,777,216 |          3,526
+  25 |         33,554,432 |          7,053
+  26 |         67,108,864 |         14,107
+  27 |        134,217,728 |         28,214
+  28 |        268,435,456 |         56,429
+
+=== circuit_size (poseidon2_native_goldilocks) ===
+For Poseidon2 (Goldilocks native, x^7): 1 Poseidon2 permutation corresponds to 5,039 (2^12.30) gates.
+
+Poseidon2 native Goldilocks circuit (width 16, x^7 S-box): circuit size 2^nv vs number of permutations
+  nv |               2^nv |  #permutations
+-----+--------------------+----------------
+  16 |             65,536 |             13
+  17 |            131,072 |             26
+  18 |            262,144 |             52
+  19 |            524,288 |            104
+  20 |          1,048,576 |            208
+  21 |          2,097,152 |            416
+  22 |          4,194,304 |            832
+  23 |          8,388,608 |          1,664
+  24 |         16,777,216 |          3,329
+  25 |         33,554,432 |          6,658
+  26 |         67,108,864 |         13,317
+  27 |        134,217,728 |         26,635
+  28 |        268,435,456 |         53,271
+
+=== circuit_size (poseidon2_native_babybear) ===
+For Poseidon2 (BabyBear native, x^7): 1 Poseidon2 permutation corresponds to 5,039 (2^12.30) gates.
+
+Poseidon2 native BabyBear circuit (width 16, x^7 S-box): circuit size 2^nv vs number of permutations
+  nv |               2^nv |  #permutations
+-----+--------------------+----------------
+  16 |             65,536 |             13
+  17 |            131,072 |             26
+  18 |            262,144 |             52
+  19 |            524,288 |            104
+  20 |          1,048,576 |            208
+  21 |          2,097,152 |            416
+  22 |          4,194,304 |            832
+  23 |          8,388,608 |          1,664
+  24 |         16,777,216 |          3,329
+  25 |         33,554,432 |          6,658
+  26 |         67,108,864 |         13,317
+  27 |        134,217,728 |         26,635
+  28 |        268,435,456 |         53,271
+

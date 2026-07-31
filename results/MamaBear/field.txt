@@ -1,0 +1,57 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-31T19:06:10+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       field
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     3
+# samples:    25 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+Goldilocks64           add             100000000      53.498 ms
+Goldilocks64           sub             100000000      64.601 ms
+Goldilocks64           mul             100000000      96.760 ms
+Goldilocks64Ext2       add             100000000      52.884 ms
+Goldilocks64Ext2       sub             100000000      54.229 ms
+Goldilocks64Ext2       mul             100000000     367.399 ms
+BabyBear               add             100000000      24.796 ms
+BabyBear               sub             100000000      26.621 ms
+BabyBear               mul             100000000     114.731 ms
+BabyBearExt4           add             100000000      21.645 ms
+BabyBearExt4           sub             100000000      21.654 ms
+BabyBearExt4           mul             100000000     341.003 ms
+MamaBearAVX-512        add             100000000       2.909 ms
+MamaBearAVX-512        sub             100000000       4.724 ms
+MamaBearAVX-512        mul             100000000       6.130 ms
+MamaBearAVX-512        lazy_add        100000000       1.288 ms
+MamaBearAVX-512        lazy_sub        100000000       1.297 ms
+MamaBearAVX-512        reduce_fast     100000000       2.738 ms
+MamaBearAVX-512        reduce          100000000       6.344 ms
+MamaBearAVX-512Ext3    add             100000000       6.858 ms
+MamaBearAVX-512Ext3    sub             100000000      11.484 ms
+MamaBearAVX-512Ext3    mul             100000000      67.923 ms
+MamaBearAVX-512Ext3    lazy_add        100000000       2.267 ms
+MamaBearAVX-512Ext3    lazy_sub        100000000       2.267 ms
+MamaBearAVX-512Ext3    reduce_fast     100000000       6.873 ms
+MamaBearAVX-512Ext3    reduce          100000000      17.533 ms
+BabyBearAVX-512        add             100000000       1.382 ms
+BabyBearAVX-512        sub             100000000       1.381 ms
+BabyBearAVX-512        mul             100000000       5.555 ms
+BabyBearAVX-512Ext4    add             100000000       5.752 ms
+BabyBearAVX-512Ext4    sub             100000000       5.746 ms
+BabyBearAVX-512Ext4    mul             100000000      82.784 ms

@@ -1,0 +1,536 @@
+diff --git a/examples/examples/prove_prime_field_31.rs b/examples/examples/prove_prime_field_31.rs
+index 1133f22..c2624c9 100644
+--- a/examples/examples/prove_prime_field_31.rs
++++ b/examples/examples/prove_prime_field_31.rs
+@@ -5,7 +5,7 @@ use p3_baby_bear::{
+ };
+ use p3_blake3_air::Blake3Air;
+ use p3_dft::Radix2DitParallel;
+-use p3_examples::airs::ProofObjective;
++use p3_examples::airs::{HyperPlonkGateAir, ProofObjective};
+ use p3_examples::dfts::DftChoice;
+ use p3_examples::parsers::{
+     DftOptions, FieldOptions, MerkleHashOptions, ProofOptions, SecurityOptions,
+@@ -104,6 +104,13 @@ fn main() {
+             println!("Proving {num_hashes} Keccak-F permutations");
+             num_hashes
+         }
++        ProofOptions::HyperPlonkGate => {
++            println!(
++                "Proving 2^{} HyperPlonk-style gates (one gate per row)",
++                args.log_trace_length
++            );
++            trace_height
++        }
+     };
+ 
+     // WARNING: Use a real cryptographic PRNG in applications!!
+@@ -136,6 +143,9 @@ fn main() {
+                     > = VectorizedPoseidon2Air::new(constants);
+                     ProofObjective::Poseidon2(p2_air)
+                 }
++                ProofOptions::HyperPlonkGate => {
++                    ProofObjective::HyperPlonkGate(HyperPlonkGateAir::<KoalaBear>::new(trace_height))
++                }
+             };
+ 
+             let dft = match args.discrete_fourier_transform {
+@@ -202,6 +212,9 @@ fn main() {
+                     > = VectorizedPoseidon2Air::new(constants);
+                     ProofObjective::Poseidon2(p2_air)
+                 }
++                ProofOptions::HyperPlonkGate => {
++                    ProofObjective::HyperPlonkGate(HyperPlonkGateAir::<BabyBear>::new(trace_height))
++                }
+             };
+ 
+             let dft = match args.discrete_fourier_transform {
+@@ -268,6 +281,12 @@ fn main() {
+                     > = VectorizedPoseidon2Air::new(constants);
+                     ProofObjective::Poseidon2(p2_air)
+                 }
++                ProofOptions::HyperPlonkGate => {
++                    panic!(
++                        "HyperPlonkGate is not wired up for Mersenne31 (circle STARK) in this patch; \
++                         use --field baby-bear (or koala-bear)"
++                    );
++                }
+             };
+ 
+             match args.discrete_fourier_transform {
+diff --git a/examples/src/airs.rs b/examples/src/airs.rs
+index c131d22..98a195f 100644
+--- a/examples/src/airs.rs
++++ b/examples/src/airs.rs
+@@ -1,5 +1,5 @@
+ use p3_air::symbolic::SymbolicAirBuilder;
+-use p3_air::{Air, AirBuilder, BaseAir, DebugConstraintBuilder};
++use p3_air::{Air, AirBuilder, BaseAir, DebugConstraintBuilder, WindowAccess};
+ use p3_blake3_air::Blake3Air;
+ use p3_challenger::FieldChallenger;
+ use p3_commit::PolynomialSpace;
+@@ -11,6 +11,134 @@ use p3_poseidon2_air::{Poseidon2Air, VectorizedPoseidon2Air};
+ use p3_uni_stark::{ProverConstraintFolder, StarkGenericConfig, VerifierConstraintFolder};
+ use rand::distr::StandardUniform;
+ use rand::prelude::Distribution;
++use rand::rngs::SmallRng;
++use rand::{RngExt, SeedableRng};
++
++/// HyperPlonk-style single-gate AIR for a fair DeepFold vs STARK comparison.
++///
++/// Layout: 3 witness columns (L, R, O) and 1 preprocessed column (S).
++/// Constraint `(1 - S)(L + R) + S * L * R - O = 0`, degree 3, one row per
++/// gate, no transition constraints, no lookups. Matches the HyperPlonk
++/// algebraic gate `h(X) = (1-S)(L+R) + S*L*R - O` at the same trace height.
++///
++/// The selector column S is sampled as a deterministic random boolean
++/// sequence (seed 2); the witness generator uses seed 3 for L, R, and
++/// derives O to satisfy the constraint by construction.
++pub struct HyperPlonkGateAir<F> {
++    pub num_rows: usize,
++    s_values: Vec<F>,
++}
++
++impl<F: PrimeCharacteristicRing> HyperPlonkGateAir<F> {
++    pub fn new(num_rows: usize) -> Self {
++        let mut rng = SmallRng::seed_from_u64(2);
++        let s_values: Vec<F> = (0..num_rows)
++            .map(|_| {
++                if rng.random::<bool>() {
++                    F::ONE
++                } else {
++                    F::ZERO
++                }
++            })
++            .collect();
++        Self { num_rows, s_values }
++    }
++}
++
++impl<F> BaseAir<F> for HyperPlonkGateAir<F>
++where
++    F: PrimeCharacteristicRing + Send + Sync,
++{
++    fn width(&self) -> usize {
++        3
++    }
++
++    fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
++        Some(RowMajorMatrix::new(self.s_values.clone(), 1))
++    }
++
++    fn main_next_row_columns(&self) -> Vec<usize> {
++        vec![]
++    }
++
++    fn preprocessed_next_row_columns(&self) -> Vec<usize> {
++        vec![]
++    }
++
++    fn max_constraint_degree(&self) -> Option<usize> {
++        Some(3)
++    }
++}
++
++impl<AB: AirBuilder> Air<AB> for HyperPlonkGateAir<AB::F>
++where
++    AB::F: PrimeCharacteristicRing + Send + Sync,
++{
++    fn eval(&self, builder: &mut AB) {
++        let main = builder.main();
++        let main_row = main.current_slice();
++        let l_var = main_row[0];
++        let r_var = main_row[1];
++        let o_var = main_row[2];
++
++        let s_var = {
++            let prep = builder.preprocessed();
++            let prep_row = prep.current_slice();
++            prep_row[0]
++        };
++
++        let one = AB::Expr::ONE;
++        let l: AB::Expr = l_var.into();
++        let r: AB::Expr = r_var.into();
++        let o: AB::Expr = o_var.into();
++        let s: AB::Expr = s_var.into();
++
++        let add_part = (one - s.clone()) * (l.clone() + r.clone());
++        let mul_part = s * l * r;
++        builder.assert_zero(add_part + mul_part - o);
++        builder.assert_bool(s_var);
++    }
++}
++
++impl<
++    F: PrimeField64,
++    Domain: PolynomialSpace<Val = F>,
++    EF: ExtensionField<F>,
++    Challenger: FieldChallenger<F>,
++    Pcs: p3_commit::Pcs<EF, Challenger, Domain = Domain>,
++    SC: StarkGenericConfig<Pcs = Pcs, Challenge = EF, Challenger = Challenger>,
++> ExampleHashAir<F, SC> for HyperPlonkGateAir<F>
++{
++    #[inline]
++    fn generate_trace_rows(
++        &self,
++        num_hashes: usize,
++        _extra_capacity_bits: usize,
++    ) -> RowMajorMatrix<F>
++    where
++        StandardUniform: Distribution<F>,
++    {
++        assert_eq!(
++            num_hashes, self.num_rows,
++            "HyperPlonkGateAir: trace row count must match self.num_rows"
++        );
++        let width: usize = 3;
++        let mut values: Vec<F> = F::zero_vec(num_hashes * width);
++        let mut rng = SmallRng::seed_from_u64(3);
++        for i in 0..num_hashes {
++            let l: F = rng.sample(StandardUniform);
++            let r: F = rng.sample(StandardUniform);
++            let s = self.s_values[i].clone();
++            // o = (1 - s) * (l + r) + s * l * r
++            let one_minus_s = F::ONE - s.clone();
++            let o = one_minus_s * (l.clone() + r.clone()) + s * l.clone() * r.clone();
++            values[i * width] = l;
++            values[i * width + 1] = r;
++            values[i * width + 2] = o;
++        }
++        RowMajorMatrix::new(values, width)
++    }
++}
+ 
+ /// An enum containing the three different AIR's.
+ ///
+@@ -39,6 +167,7 @@ pub enum ProofObjective<
+             VECTOR_LEN,
+         >,
+     ),
++    HyperPlonkGate(HyperPlonkGateAir<F>),
+ }
+ 
+ /// An AIR for a hash function used for example proofs and benchmarking.
+@@ -62,7 +191,7 @@ pub trait ExampleHashAir<F: Field, SC: StarkGenericConfig>:
+ }
+ 
+ impl<
+-    F: PrimeCharacteristicRing + Sync,
++    F: PrimeCharacteristicRing + Send + Sync,
+     LinearLayers: Sync,
+     const WIDTH: usize,
+     const SBOX_DEGREE: u64,
+@@ -88,6 +217,46 @@ impl<
+             Self::Blake3(b3_air) => <Blake3Air as BaseAir<F>>::width(b3_air),
+             Self::Poseidon2(p2_air) => p2_air.width(),
+             Self::Keccak(k_air) => <KeccakAir as BaseAir<F>>::width(k_air),
++            Self::HyperPlonkGate(hp_air) => {
++                <HyperPlonkGateAir<F> as BaseAir<F>>::width(hp_air)
++            }
++        }
++    }
++
++    #[inline]
++    fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
++        match self {
++            Self::HyperPlonkGate(hp_air) => {
++                <HyperPlonkGateAir<F> as BaseAir<F>>::preprocessed_trace(hp_air)
++            }
++            _ => None,
++        }
++    }
++
++    #[inline]
++    fn main_next_row_columns(&self) -> Vec<usize> {
++        match self {
++            Self::HyperPlonkGate(_) => vec![],
++            _ => (0..self.width()).collect(),
++        }
++    }
++
++    #[inline]
++    fn preprocessed_next_row_columns(&self) -> Vec<usize> {
++        match self {
++            Self::HyperPlonkGate(_) => vec![],
++            _ => self
++                .preprocessed_trace()
++                .map(|t| (0..t.width).collect())
++                .unwrap_or_default(),
++        }
++    }
++
++    #[inline]
++    fn max_constraint_degree(&self) -> Option<usize> {
++        match self {
++            Self::HyperPlonkGate(_) => Some(3),
++            _ => None,
+         }
+     }
+ }
+@@ -112,6 +281,8 @@ impl<
+         PARTIAL_ROUNDS,
+         VECTOR_LEN,
+     >
++where
++    AB::F: Send,
+ {
+     #[inline]
+     fn eval(&self, builder: &mut AB) {
+@@ -119,6 +290,7 @@ impl<
+             Self::Blake3(b3_air) => b3_air.eval(builder),
+             Self::Poseidon2(p2_air) => p2_air.eval(builder),
+             Self::Keccak(k_air) => k_air.eval(builder),
++            Self::HyperPlonkGate(hp_air) => hp_air.eval(builder),
+         }
+     }
+ }
+@@ -164,6 +336,13 @@ impl<
+                 p2_air.generate_vectorized_trace_rows(num_hashes, extra_capacity_bits)
+             }
+             Self::Keccak(k_air) => k_air.generate_trace_rows(num_hashes, extra_capacity_bits),
++            Self::HyperPlonkGate(hp_air) => {
++                <HyperPlonkGateAir<F> as ExampleHashAir<F, SC>>::generate_trace_rows(
++                    hp_air,
++                    num_hashes,
++                    extra_capacity_bits,
++                )
++            }
+         }
+     }
+ }
+diff --git a/examples/src/parsers.rs b/examples/src/parsers.rs
+index 9863b8c..84b7512 100644
+--- a/examples/src/parsers.rs
++++ b/examples/src/parsers.rs
+@@ -20,6 +20,9 @@ pub enum ProofOptions {
+     Blake3Permutations,
+     KeccakFPermutations,
+     Poseidon2Permutations,
++    /// HyperPlonk-style degree-3 gate: `(1 - s)(l + r) + s*l*r - o = 0`,
++    /// one gate per row, 3 witness cols + 1 preprocessed selector.
++    HyperPlonkGate,
+ }
+ 
+ #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+@@ -99,6 +102,7 @@ impl ValueEnum for ProofOptions {
+             Self::Blake3Permutations,
+             Self::Poseidon2Permutations,
+             Self::KeccakFPermutations,
++            Self::HyperPlonkGate,
+         ]
+     }
+ 
+@@ -119,6 +123,8 @@ impl ValueEnum for ProofOptions {
+                 1,
+                 Some(vec![("poseidon2-permutations", 9), ("p2", 2)]),
+             ),
++            Self::HyperPlonkGate => PossibleValue::new("hyper-plonk-gate")
++                .aliases(["hyperplonk-gate", "hpg", "hp-gate"]),
+         })
+     }
+ }
+diff --git a/examples/src/proofs.rs b/examples/src/proofs.rs
+index 90b69b7..4624639 100644
+--- a/examples/src/proofs.rs
++++ b/examples/src/proofs.rs
+@@ -8,10 +8,14 @@ use p3_dft::TwoAdicSubgroupDft;
+ use p3_field::extension::{BinomialExtensionField, ComplexExtendable};
+ use p3_field::{ExtensionField, Field, PrimeField32, PrimeField64, TwoAdicField};
+ use p3_fri::{FriParameters, TwoAdicFriPcs};
++use p3_matrix::Matrix;
+ use p3_keccak::{Keccak256Hash, KeccakF};
+ use p3_mersenne_31::Mersenne31;
+ use p3_symmetric::{CryptographicPermutation, PaddingFreeSponge, SerializingHasher};
+-use p3_uni_stark::{PcsError, Proof, StarkGenericConfig, VerificationError, prove, verify};
++use p3_uni_stark::{
++    PcsError, Proof, StarkGenericConfig, VerificationError, prove, prove_with_preprocessed,
++    setup_preprocessed, verify, verify_with_preprocessed,
++};
+ use rand::distr::StandardUniform;
+ use rand::prelude::Distribution;
+ 
+@@ -46,8 +50,8 @@ fn env_usize(key: &str, default: usize) -> usize {
+ /// `BENCH_SAMPLES` timed samples, all inside a single process so caches
+ /// and the allocator are genuinely primed across iterations. Returns the
+ /// median sample time (ms) and the final proof. Also resets the peak-heap
+-/// tracker after warmup so `PLONKY3_PEAK_BYTES` reflects only measured
+-/// runs.
++/// tracker after warmup so `PLONKY3_PROVE_PEAK_BYTES` reflects only
++/// measured prove runs.
+ fn bench_prove<T>(mut produce_proof: impl FnMut() -> T) -> (f64, T) {
+     let warmup = env_usize("BENCH_WARMUP", 1);
+     let samples = env_usize("BENCH_SAMPLES", 5).max(1);
+@@ -73,6 +77,38 @@ fn bench_prove<T>(mut produce_proof: impl FnMut() -> T) -> (f64, T) {
+     (median_ms, last.expect("samples >= 1"))
+ }
+ 
++/// Run `do_verify` with `BENCH_WARMUP` un-timed warmups followed by
++/// `BENCH_SAMPLES` timed samples; return median sample time (ms) and
++/// assert every sample returned the same Ok/Err status. Resets the
++/// peak-heap tracker after warmup so `PLONKY3_VERIFY_PEAK_BYTES` reflects
++/// only measured verify runs.
++fn bench_verify<E: core::fmt::Debug>(
++    mut do_verify: impl FnMut() -> Result<(), E>,
++) -> (f64, Result<(), E>) {
++    let warmup = env_usize("BENCH_WARMUP", 1);
++    let samples = env_usize("BENCH_SAMPLES", 5).max(1);
++
++    for _ in 0..warmup {
++        let _ = do_verify();
++    }
++
++    #[cfg(feature = "measure-peak")]
++    crate::PEAK_ALLOC.reset_peak_usage();
++
++    let mut times_ms: Vec<f64> = Vec::with_capacity(samples);
++    let mut last: Option<Result<(), E>> = None;
++    for _ in 0..samples {
++        let t0 = Instant::now();
++        let result = do_verify();
++        let elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0;
++        times_ms.push(elapsed_ms);
++        last = Some(result);
++    }
++    times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
++    let median_ms = times_ms[times_ms.len() / 2];
++    (median_ms, last.expect("samples >= 1"))
++}
++
+ /// Result type for Keccak-based two-adic proofs
+ type KeccakTwoAdicResult<F, EF, DFT> =
+     Result<(), VerificationError<PcsError<KeccakStarkConfig<F, EF, DFT>>>>;
+@@ -157,16 +193,48 @@ where
+ 
+     let config = KeccakStarkConfig::new(pcs, challenger);
+ 
+-    let (median_ms, proof) = bench_prove(|| {
++    // One-off setup pass: measure trace height to size the preprocessed
++    // commitment, then build preprocessed prover data + verifier key.
++    // For AIRs without preprocessed columns (Blake3/Keccak/Poseidon2) this
++    // returns None and we fall through to the same path `prove()` took
++    // previously. For AIRs with a preprocessed trace (HyperPlonkGateAir),
++    // the commitment is computed here, outside the timed loop, mirroring
++    // HyperPlonk's pp_setup which is likewise not counted in prove time.
++    let degree_bits = {
+         let trace = proof_goal.generate_trace_rows(num_hashes, log_blowup);
+-        prove(&config, proof_goal, trace, &[])
++        trace.height().trailing_zeros() as usize
++    };
++    let preprocessed = setup_preprocessed::<_, _>(&config, proof_goal, degree_bits);
++
++    let (prove_median_ms, proof) = bench_prove(|| {
++        let trace = proof_goal.generate_trace_rows(num_hashes, log_blowup);
++        prove_with_preprocessed(
++            &config,
++            proof_goal,
++            trace,
++            &[],
++            preprocessed.as_ref().map(|(pd, _)| pd),
++        )
+     });
+ 
+-    println!("PLONKY3_PROVE_MS: {median_ms:.3}");
++    println!("PLONKY3_PROVE_MS: {prove_median_ms:.3}");
+     report_proof_size(&proof);
+-    report_peak_memory();
++    report_prove_peak_memory();
++
++    let (verify_median_ms, verify_result) = bench_verify(|| {
++        verify_with_preprocessed(
++            &config,
++            proof_goal,
++            &proof,
++            &[],
++            preprocessed.as_ref().map(|(_, vk)| vk),
++        )
++    });
+ 
+-    verify(&config, proof_goal, &proof, &[])
++    println!("PLONKY3_VERIFY_MS: {verify_median_ms:.3}");
++    report_verify_peak_memory();
++
++    verify_result
+ }
+ 
+ /// Prove the given ProofGoal using the Poseidon2 hash function to build the merkle tree.
+@@ -205,16 +273,41 @@ where
+ 
+     let config = Poseidon2StarkConfig::new(pcs, challenger);
+ 
+-    let (median_ms, proof) = bench_prove(|| {
++    let degree_bits = {
+         let trace = proof_goal.generate_trace_rows(num_hashes, log_blowup);
+-        prove(&config, proof_goal, trace, &[])
++        trace.height().trailing_zeros() as usize
++    };
++    let preprocessed = setup_preprocessed::<_, _>(&config, proof_goal, degree_bits);
++
++    let (prove_median_ms, proof) = bench_prove(|| {
++        let trace = proof_goal.generate_trace_rows(num_hashes, log_blowup);
++        prove_with_preprocessed(
++            &config,
++            proof_goal,
++            trace,
++            &[],
++            preprocessed.as_ref().map(|(pd, _)| pd),
++        )
+     });
+ 
+-    println!("PLONKY3_PROVE_MS: {median_ms:.3}");
++    println!("PLONKY3_PROVE_MS: {prove_median_ms:.3}");
+     report_proof_size(&proof);
+-    report_peak_memory();
++    report_prove_peak_memory();
++
++    let (verify_median_ms, verify_result) = bench_verify(|| {
++        verify_with_preprocessed(
++            &config,
++            proof_goal,
++            &proof,
++            &[],
++            preprocessed.as_ref().map(|(_, vk)| vk),
++        )
++    });
+ 
+-    verify(&config, proof_goal, &proof, &[])
++    println!("PLONKY3_VERIFY_MS: {verify_median_ms:.3}");
++    report_verify_peak_memory();
++
++    verify_result
+ }
+ 
+ /// Prove the given ProofGoal using the Keccak hash function to build the merkle tree.
+@@ -322,12 +415,30 @@ where
+     println!("PLONKY3_PROOF_BYTES: {len}");
+ }
+ 
+-/// Report peak heap memory when `measure-peak` is on.
++/// Report peak heap memory observed during the prove phase and keep it
++/// available for legacy parsers. `bench_prove` resets the peak counter
++/// after warmup, so this reflects just the measured prove runs.
+ #[inline]
+-pub fn report_peak_memory() {
++pub fn report_prove_peak_memory() {
+     #[cfg(feature = "measure-peak")]
+     {
+         let peak = crate::PEAK_ALLOC.peak_usage();
++        // New split marker used by reproduce_plonky3_rand_circuit.sh.
++        println!("PLONKY3_PROVE_PEAK_BYTES: {peak}");
++        // Back-compat marker for reproduce_plonky3.sh, which only records
++        // a single peak per run.
+         println!("PLONKY3_PEAK_BYTES: {peak}");
+     }
+ }
++
++/// Report peak heap memory observed during the verify phase.
++/// `bench_verify` resets the peak counter after its own warmup so this
++/// reflects only measured verify runs.
++#[inline]
++pub fn report_verify_peak_memory() {
++    #[cfg(feature = "measure-peak")]
++    {
++        let peak = crate::PEAK_ALLOC.peak_usage();
++        println!("PLONKY3_VERIFY_PEAK_BYTES: {peak}");
++    }
++}

@@ -1,0 +1,217 @@
+[package]
+name = "hyperplonk"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+arithmetic = { path = "../arithmetic" }
+poly_commit = { path = "../poly_commit" }
+util = { path = "../util" }
+rand = {version = "0.9.2", default-features = false, features = ["small_rng"]}
+csv = "1.3.0"
+rayon = "1.10"
+peak_alloc = "0.3"
+serde_json = "1"
+
+[dev-dependencies]
+
+# --- benches/piop ---
+[[bench]]
+name = "piop"
+path = "benches/piop/piop.rs"
+harness = false
+
+[[bench]]
+name = "prodcheck_babybear"
+path = "benches/piop/prodcheck_babybear.rs"
+harness = false
+
+[[bench]]
+name = "prodcheck_goldilocks"
+path = "benches/piop/prodcheck_goldilocks.rs"
+harness = false
+
+[[bench]]
+name = "prodcheck_mamabear"
+path = "benches/piop/prodcheck_mamabear.rs"
+harness = false
+
+[[bench]]
+name = "zerocheck_babybear"
+path = "benches/piop/zerocheck_babybear.rs"
+harness = false
+
+[[bench]]
+name = "zerocheck_goldilocks"
+path = "benches/piop/zerocheck_goldilocks.rs"
+harness = false
+
+[[bench]]
+name = "zerocheck_mamabear"
+path = "benches/piop/zerocheck_mamabear.rs"
+harness = false
+
+# --- benches/pcs ---
+[[bench]]
+name = "deepfold_babybear"
+path = "benches/pcs/deepfold_babybear.rs"
+harness = false
+
+[[bench]]
+name = "deepfold_goldilocks"
+path = "benches/pcs/deepfold_goldilocks.rs"
+harness = false
+
+[[bench]]
+name = "deepfold_mamabear"
+path = "benches/pcs/deepfold_mamabear.rs"
+harness = false
+
+[[bench]]
+name = "deepfold_mamabear_par"
+path = "benches/pcs/deepfold_mamabear_par.rs"
+harness = false
+
+# --- benches/e2e ---
+[[bench]]
+name = "hp_df_babybear"
+path = "benches/e2e/hp_df_babybear.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_babybear_aes128"
+path = "benches/e2e/hp_df_babybear_aes128.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_babybear_blake3"
+path = "benches/e2e/hp_df_babybear_blake3.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_babybear_sha256"
+path = "benches/e2e/hp_df_babybear_sha256.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_goldilocks"
+path = "benches/e2e/hp_df_goldilocks.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_goldilocks_aes128"
+path = "benches/e2e/hp_df_goldilocks_aes128.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_goldilocks_blake3"
+path = "benches/e2e/hp_df_goldilocks_blake3.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_goldilocks_sha256"
+path = "benches/e2e/hp_df_goldilocks_sha256.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear"
+path = "benches/e2e/hp_df_mamabear.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_aes128"
+path = "benches/e2e/hp_df_mamabear_aes128.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_aes128_par"
+path = "benches/e2e/hp_df_mamabear_aes128_par.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_blake3"
+path = "benches/e2e/hp_df_mamabear_blake3.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_blake3_par"
+path = "benches/e2e/hp_df_mamabear_blake3_par.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_keccak"
+path = "benches/e2e/hp_df_mamabear_keccak.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_keccak_par"
+path = "benches/e2e/hp_df_mamabear_keccak_par.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_par"
+path = "benches/e2e/hp_df_mamabear_par.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_sha256"
+path = "benches/e2e/hp_df_mamabear_sha256.rs"
+harness = false
+
+[[bench]]
+name = "hp_df_mamabear_sha256_par"
+path = "benches/e2e/hp_df_mamabear_sha256_par.rs"
+harness = false
+
+[[bench]]
+name = "hyperplonk_basefold_goldilocks"
+path = "benches/e2e/hyperplonk_basefold_goldilocks.rs"
+harness = false
+
+# The x86-only profiling/size bins import AVX-512 MamaBear types and so do not
+# build on other architectures. `cargo bench` / `cargo test` compile all bins
+# by default, which would break every `--bench` / `--test` invocation there;
+# mark them `bench = false, test = false` so only an explicit
+# `cargo run --bin NAME` (x86) builds them.
+
+# `bench_config` is the exception to the note above: it touches no arch-gated
+# prover module (it only reads `util::params` constants), so it builds for real
+# on any architecture.
+[[bin]]
+name = "bench_config"
+path = "src/bin/bench_config.rs"
+bench = false
+test = false
+
+[[bin]]
+name = "circuit_size"
+path = "src/bin/circuit_size.rs"
+bench = false
+test = false
+
+[[bin]]
+name = "peak_memory"
+path = "src/bin/peak_memory.rs"
+bench = false
+test = false
+
+[[bin]]
+name = "profile_hp_df_goldilocks"
+path = "src/bin/profile_hp_df_goldilocks.rs"
+bench = false
+test = false
+
+[[bin]]
+name = "profile_hp_df_mamabear"
+path = "src/bin/profile_hp_df_mamabear.rs"
+bench = false
+test = false
+
+[[bin]]
+name = "proof_size"
+path = "src/bin/proof_size.rs"
+bench = false
+test = false
+

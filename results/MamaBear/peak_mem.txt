@@ -1,0 +1,318 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-29T11:39:01+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       zc,own pc,own df,own hp_df,own mem
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits  <- what the name PROV_QUERY128 refers to
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5  (falls ~1 bit per +1 nv)
+# fri-commit-thm: bad-folding-challenge count is O(n) per Ben-Sasson-Carmon-Haboeck-Kopparty-Saraf, STOC 2026, Thm 1.5 (proximity loss 0, explicit constant); supersedes the O(n^2) count of BCIKS FOCS 2020 + Haboeck 2022, which gave C=83.0 at nv=19 for MamaBear Ext3.  Caveat: STOC states the line case; the affine-space (batched) constant is to be confirmed against the full version.
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+HP DF Goldilocks prov128 nv=18 witness_setup                    14.00 MiB
+HP DF Goldilocks prov128 nv=18 pp_setup                          0.52 GiB
+HP DF Goldilocks prov128 nv=18 prove                             0.56 GiB
+HP DF Goldilocks prov128 nv=18 verify                            0.91 MiB
+HP DF Goldilocks SHA256 prov128 nv=19 witness_setup             64.50 MiB
+HP DF Goldilocks SHA256 prov128 nv=19 pp_setup                   1.05 GiB
+HP DF Goldilocks SHA256 prov128 nv=19 prove                      1.11 GiB
+HP DF Goldilocks SHA256 prov128 nv=19 verify                     0.10 MiB
+HP DF Goldilocks SHA256 prov128 nv=20 witness_setup            129.00 MiB
+HP DF Goldilocks SHA256 prov128 nv=20 pp_setup                   2.09 GiB
+HP DF Goldilocks SHA256 prov128 nv=20 prove                      2.23 GiB
+HP DF Goldilocks SHA256 prov128 nv=20 verify                     0.09 MiB
+HP DF Goldilocks SHA256 prov128 nv=21 witness_setup            258.00 MiB
+HP DF Goldilocks SHA256 prov128 nv=21 pp_setup                   4.19 GiB
+HP DF Goldilocks SHA256 prov128 nv=21 prove                      4.45 GiB
+HP DF Goldilocks SHA256 prov128 nv=21 verify                     0.10 MiB
+HP DF Goldilocks SHA256 prov128 nv=22 witness_setup            516.00 MiB
+HP DF Goldilocks SHA256 prov128 nv=22 pp_setup                   8.38 GiB
+HP DF Goldilocks SHA256 prov128 nv=22 prove                      8.91 GiB
+HP DF Goldilocks SHA256 prov128 nv=22 verify                     0.10 MiB
+HP DF Goldilocks SHA256 prov128 nv=23 witness_setup           1032.00 MiB
+HP DF Goldilocks SHA256 prov128 nv=23 pp_setup                  16.75 GiB
+HP DF Goldilocks SHA256 prov128 nv=23 prove                     17.81 GiB
+HP DF Goldilocks SHA256 prov128 nv=23 verify                     0.10 MiB
+HP DF Goldilocks SHA256 prov128 nv=24 witness_setup           2064.00 MiB
+HP DF Goldilocks SHA256 prov128 nv=24 pp_setup                  33.50 GiB
+HP DF Goldilocks SHA256 prov128 nv=24 prove                     35.63 GiB
+HP DF Goldilocks SHA256 prov128 nv=24 verify                     0.10 MiB
+HP DF Babybear prov128 nv=18 witness_setup                       7.00 MiB
+HP DF Babybear prov128 nv=18 pp_setup                            0.43 GiB
+HP DF Babybear prov128 nv=18 prove                               0.52 GiB
+HP DF Babybear prov128 nv=18 verify                              0.94 MiB
+HP DF Babybear SHA256 prov128 nv=19 witness_setup               50.50 MiB
+HP DF Babybear SHA256 prov128 nv=19 pp_setup                     0.87 GiB
+HP DF Babybear SHA256 prov128 nv=19 prove                        1.03 GiB
+HP DF Babybear SHA256 prov128 nv=19 verify                       0.92 MiB
+HP DF Babybear SHA256 prov128 nv=20 witness_setup              101.00 MiB
+HP DF Babybear SHA256 prov128 nv=20 pp_setup                     1.73 GiB
+HP DF Babybear SHA256 prov128 nv=20 prove                        2.06 GiB
+HP DF Babybear SHA256 prov128 nv=20 verify                       0.94 MiB
+HP DF Babybear SHA256 prov128 nv=21 witness_setup              202.00 MiB
+HP DF Babybear SHA256 prov128 nv=21 pp_setup                     3.47 GiB
+HP DF Babybear SHA256 prov128 nv=21 prove                        4.12 GiB
+HP DF Babybear SHA256 prov128 nv=21 verify                       1.92 MiB
+HP DF Babybear SHA256 prov128 nv=22 witness_setup              404.00 MiB
+HP DF Babybear SHA256 prov128 nv=22 pp_setup                     6.94 GiB
+HP DF Babybear SHA256 prov128 nv=22 prove                        8.24 GiB
+HP DF Babybear SHA256 prov128 nv=22 verify                       1.89 MiB
+HP DF Babybear SHA256 prov128 nv=23 witness_setup              808.00 MiB
+HP DF Babybear SHA256 prov128 nv=23 pp_setup                    13.88 GiB
+HP DF Babybear SHA256 prov128 nv=23 prove                       16.47 GiB
+HP DF Babybear SHA256 prov128 nv=23 verify                       1.88 MiB
+HP DF Babybear SHA256 prov128 nv=24 witness_setup             1616.00 MiB
+HP DF Babybear SHA256 prov128 nv=24 pp_setup                    27.75 GiB
+HP DF Babybear SHA256 prov128 nv=24 prove                       32.94 GiB
+HP DF Babybear SHA256 prov128 nv=24 verify                       1.87 MiB
+HP DF Mamabear prov128 split=3 nv=18 witness_setup              20.00 MiB
+HP DF Mamabear prov128 split=3 nv=18 pp_setup                    0.11 GiB
+HP DF Mamabear prov128 split=3 nv=18 prove                       0.13 GiB
+HP DF Mamabear prov128 split=3 nv=18 verify                      0.89 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=19 witness_setup       64.50 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=19 pp_setup             0.23 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=19 prove                0.27 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=19 verify               0.88 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=20 witness_setup      129.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=20 pp_setup             0.45 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=20 prove                0.54 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=20 verify               0.86 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=21 witness_setup      258.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=21 pp_setup             0.89 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=21 prove                1.08 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=21 verify               0.87 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=22 witness_setup      516.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=22 pp_setup             1.78 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=22 prove                2.15 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=22 verify               0.89 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=23 witness_setup     1032.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=23 pp_setup             3.56 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=23 prove                4.30 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=23 verify               1.88 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=24 witness_setup     2064.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=24 pp_setup             7.13 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=24 prove                8.60 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=24 verify               1.87 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=25 witness_setup     4128.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=25 pp_setup            14.25 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=25 prove               17.20 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=25 verify               1.84 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=26 witness_setup     8256.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=26 pp_setup            28.50 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=26 prove               34.41 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=26 verify               1.83 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=27 witness_setup    16512.00 MiB
+HP DF Mamabear SHA256 prov128 split=3 nv=27 pp_setup            57.00 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=27 prove               68.81 GiB
+HP DF Mamabear SHA256 prov128 split=3 nv=27 verify               1.85 MiB
+HP DF Mamabear par prov128 split=3 nv=18 witness_setup          20.00 MiB
+HP DF Mamabear par prov128 split=3 nv=18 pp_setup                0.11 GiB
+HP DF Mamabear par prov128 split=3 nv=18 prove_par               0.19 GiB
+HP DF Mamabear par prov128 split=3 nv=18 verify                  0.89 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=19 witness_setup    64.50 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=19 pp_setup         0.23 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=19 prove_par        0.37 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=19 verify           0.88 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=20 witness_setup   129.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=20 pp_setup         0.45 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=20 prove_par        0.74 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=20 verify           0.86 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=21 witness_setup   258.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=21 pp_setup         0.89 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=21 prove_par        1.49 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=21 verify           0.87 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=22 witness_setup   516.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=22 pp_setup         1.78 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=22 prove_par        2.97 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=22 verify           0.89 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=23 witness_setup  1032.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=23 pp_setup         3.56 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=23 prove_par        5.94 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=23 verify           1.88 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=24 witness_setup  2064.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=24 pp_setup         7.13 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=24 prove_par       11.88 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=24 verify           1.87 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=25 witness_setup  4128.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=25 pp_setup        14.25 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=25 prove_par       23.75 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=25 verify           1.84 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=26 witness_setup  8256.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=26 pp_setup        28.50 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=26 prove_par       47.50 GiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=26 verify           1.83 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=27 witness_setup 16512.00 MiB
+HP DF Mamabear SHA256 par prov128 split=3 nv=27 pp_setup        57.00 GiB
+HP DF Mamabear prov128 split=4 nv=18 witness_setup              20.00 MiB
+HP DF Mamabear prov128 split=4 nv=18 pp_setup                    0.10 GiB
+HP DF Mamabear prov128 split=4 nv=18 prove                       0.13 GiB
+HP DF Mamabear prov128 split=4 nv=18 verify                      0.85 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=19 witness_setup       64.50 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=19 pp_setup             0.20 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=19 prove                0.25 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=19 verify               0.85 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=20 witness_setup      129.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=20 pp_setup             0.41 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=20 prove                0.51 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=20 verify               0.85 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=21 witness_setup      258.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=21 pp_setup             0.81 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=21 prove                1.02 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=21 verify               0.86 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=22 witness_setup      516.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=22 pp_setup             1.63 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=22 prove                2.03 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=22 verify               0.86 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=23 witness_setup     1032.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=23 pp_setup             3.25 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=23 prove                4.06 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=23 verify               1.82 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=24 witness_setup     2064.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=24 pp_setup             6.50 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=24 prove                8.13 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=24 verify               1.80 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=25 witness_setup     4128.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=25 pp_setup            13.00 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=25 prove               16.25 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=25 verify               1.79 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=26 witness_setup     8256.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=26 pp_setup            26.00 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=26 prove               32.50 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=26 verify               1.77 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=27 witness_setup    16512.00 MiB
+HP DF Mamabear SHA256 prov128 split=4 nv=27 pp_setup            52.00 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=27 prove               65.00 GiB
+HP DF Mamabear SHA256 prov128 split=4 nv=27 verify               1.75 MiB
+HP DF Mamabear par prov128 split=4 nv=18 witness_setup          20.00 MiB
+HP DF Mamabear par prov128 split=4 nv=18 pp_setup                0.10 GiB
+HP DF Mamabear par prov128 split=4 nv=18 prove_par               0.17 GiB
+HP DF Mamabear par prov128 split=4 nv=18 verify                  0.85 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=19 witness_setup    64.50 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=19 pp_setup         0.20 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=19 prove_par        0.35 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=19 verify           0.85 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=20 witness_setup   129.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=20 pp_setup         0.41 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=20 prove_par        0.69 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=20 verify           0.85 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=21 witness_setup   258.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=21 pp_setup         0.81 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=21 prove_par        1.38 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=21 verify           0.86 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=22 witness_setup   516.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=22 pp_setup         1.63 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=22 prove_par        2.75 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=22 verify           0.86 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=23 witness_setup  1032.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=23 pp_setup         3.25 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=23 prove_par        5.50 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=23 verify           1.82 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=24 witness_setup  2064.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=24 pp_setup         6.50 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=24 prove_par       11.00 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=24 verify           1.80 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=25 witness_setup  4128.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=25 pp_setup        13.00 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=25 prove_par       22.00 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=25 verify           1.79 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=26 witness_setup  8256.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=26 pp_setup        26.00 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=26 prove_par       44.00 GiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=26 verify           1.77 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=27 witness_setup 16512.00 MiB
+HP DF Mamabear SHA256 par prov128 split=4 nv=27 pp_setup        52.00 GiB
+HP DF Mamabear prov128 split=5 nv=18 witness_setup              20.00 MiB
+HP DF Mamabear prov128 split=5 nv=18 pp_setup                    0.10 GiB
+HP DF Mamabear prov128 split=5 nv=18 prove                       0.13 GiB
+HP DF Mamabear prov128 split=5 nv=18 verify                      1.63 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=19 witness_setup       64.50 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=19 pp_setup             0.19 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=19 prove                0.25 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=19 verify               1.64 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=20 witness_setup      129.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=20 pp_setup             0.39 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=20 prove                0.50 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=20 verify               1.71 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=21 witness_setup      258.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=21 pp_setup             0.78 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=21 prove                1.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=21 verify               1.69 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=22 witness_setup      516.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=22 pp_setup             1.55 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=22 prove                2.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=22 verify               1.67 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=23 witness_setup     1032.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=23 pp_setup             3.09 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=23 prove                4.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=23 verify               1.66 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=24 witness_setup     2064.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=24 pp_setup             6.19 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=24 prove                8.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=24 verify               1.66 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=25 witness_setup     4128.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=25 pp_setup            12.38 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=25 prove               16.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=25 verify               1.66 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=26 witness_setup     8256.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=26 pp_setup            24.75 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=26 prove               32.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=26 verify               1.66 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=27 witness_setup    16512.00 MiB
+HP DF Mamabear SHA256 prov128 split=5 nv=27 pp_setup            49.50 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=27 prove               64.00 GiB
+HP DF Mamabear SHA256 prov128 split=5 nv=27 verify               1.66 MiB
+HP DF Mamabear par prov128 split=5 nv=18 witness_setup          20.00 MiB
+HP DF Mamabear par prov128 split=5 nv=18 pp_setup                0.10 GiB
+HP DF Mamabear par prov128 split=5 nv=18 prove_par               0.17 GiB
+HP DF Mamabear par prov128 split=5 nv=18 verify                  1.63 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=19 witness_setup    64.50 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=19 pp_setup         0.19 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=19 prove_par        0.33 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=19 verify           1.64 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=20 witness_setup   129.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=20 pp_setup         0.39 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=20 prove_par        0.66 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=20 verify           1.71 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=21 witness_setup   258.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=21 pp_setup         0.78 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=21 prove_par        1.32 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=21 verify           1.69 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=22 witness_setup   516.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=22 pp_setup         1.55 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=22 prove_par        2.66 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=22 verify           1.67 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=23 witness_setup  1032.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=23 pp_setup         3.09 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=23 prove_par        5.31 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=23 verify           1.66 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=24 witness_setup  2064.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=24 pp_setup         6.19 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=24 prove_par       10.63 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=24 verify           1.66 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=25 witness_setup  4128.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=25 pp_setup        12.38 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=25 prove_par       21.25 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=25 verify           1.66 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=26 witness_setup  8256.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=26 pp_setup        24.75 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=26 prove_par       42.50 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=26 verify           1.66 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=27 witness_setup 16512.00 MiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=27 pp_setup        49.50 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=27 prove_par       85.00 GiB
+HP DF Mamabear SHA256 par prov128 split=5 nv=27 verify           1.66 MiB

@@ -1,0 +1,181 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-29T21:31:20+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       hp_df,own
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits  <- what the name PROV_QUERY128 refers to
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5  (falls ~1 bit per +1 nv)
+# fri-commit-thm: bad-folding-challenge count is O(n) per Ben-Sasson-Carmon-Haboeck-Kopparty-Saraf, STOC 2026, Thm 1.5 (proximity loss 0, explicit constant); supersedes the O(n^2) count of BCIKS FOCS 2020 + Haboeck 2022, which gave C=83.0 at nv=19 for MamaBear Ext3.  Caveat: STOC states the line case; the affine-space (batched) constant is to be confirmed against the full version.
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+# ---- provenance ----
+# The MamaBear row blocks below were measured by the run described in this
+# header. The Goldilocks and BabyBear blocks are carried over unchanged from
+# the 2026-07-27 capture on the same machine: this codebase has no
+# multithreaded Goldilocks/BabyBear prover, so those rows are single-threaded
+# and the parallel worker count cannot move them. They were left in place
+# rather than re-measured so the re-run could target only what changed.
+# A full ./reproduce_addmul.sh all regenerates every block in one capture.
+# ============================
+
+HP DF BabyBear prov128 prove NV=18                             1815.499 ms
+HP DF BabyBear prov128 verify NV=18                               2.657 ms
+HP DF BabyBear SHA256 prov128 prove NV=19 blocks=1             3877.873 ms
+HP DF BabyBear SHA256 prov128 verify NV=19 blocks=1               2.971 ms
+HP DF BabyBear SHA256 prov128 prove NV=20 blocks=3             8072.627 ms
+HP DF BabyBear SHA256 prov128 verify NV=20 blocks=3               3.214 ms
+HP DF BabyBear SHA256 prov128 prove NV=21 blocks=6            16598.913 ms
+HP DF BabyBear SHA256 prov128 verify NV=21 blocks=6               3.575 ms
+HP DF BabyBear SHA256 prov128 prove NV=22 blocks=13           33862.346 ms
+HP DF BabyBear SHA256 prov128 verify NV=22 blocks=13              3.983 ms
+HP DF BabyBear SHA256 prov128 prove NV=23 blocks=27           68644.101 ms
+HP DF BabyBear SHA256 prov128 verify NV=23 blocks=27              4.397 ms
+HP DF BabyBear SHA256 prov128 prove NV=24 blocks=55          138003.911 ms
+HP DF BabyBear SHA256 prov128 verify NV=24 blocks=55              4.793 ms
+
+HP DF Goldilocks prov128 prove NV=18                           2071.444 ms
+HP DF Goldilocks prov128 verify NV=18                             4.155 ms
+HP DF Goldilocks SHA256 prov128 prove NV=19 blocks=1           4342.248 ms
+HP DF Goldilocks SHA256 prov128 verify NV=19 blocks=1             1.965 ms
+HP DF Goldilocks SHA256 prov128 prove NV=20 blocks=3           8840.495 ms
+HP DF Goldilocks SHA256 prov128 verify NV=20 blocks=3             2.145 ms
+HP DF Goldilocks SHA256 prov128 prove NV=21 blocks=6          18607.773 ms
+HP DF Goldilocks SHA256 prov128 verify NV=21 blocks=6             2.338 ms
+HP DF Goldilocks SHA256 prov128 prove NV=22 blocks=13         37300.773 ms
+HP DF Goldilocks SHA256 prov128 verify NV=22 blocks=13            2.531 ms
+HP DF Goldilocks SHA256 prov128 prove NV=23 blocks=27         75487.574 ms
+HP DF Goldilocks SHA256 prov128 verify NV=23 blocks=27            2.733 ms
+HP DF Goldilocks SHA256 prov128 prove NV=24 blocks=55        152842.434 ms
+HP DF Goldilocks SHA256 prov128 verify NV=24 blocks=55            2.947 ms
+
+HP DF MamaBear Ext3 split=3 prov128 prove NV=18                 127.042 ms
+HP DF MamaBear Ext3 split=3 prov128 verify NV=18                  1.140 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=19 blocks=1    278.371 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=19 blocks=1      1.230 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=20 blocks=3    637.987 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=20 blocks=3      1.310 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=21 blocks=6   1361.406 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=21 blocks=6      1.422 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=22 blocks=13   3509.468 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=22 blocks=13      1.500 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=23 blocks=27   7957.517 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=23 blocks=27      1.647 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=24 blocks=55  17245.722 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=24 blocks=55      1.703 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=25 blocks=111  37675.237 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=25 blocks=111      1.817 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 prove NV=26 blocks=222  81481.864 ms
+HP DF MamaBear SHA256 Ext3 split=3 prov128 verify NV=26 blocks=222      1.933 ms
+
+HP DF MamaBear Par Ext3 split=3 prov128 prove_par NV=18          53.140 ms
+HP DF MamaBear Par Ext3 split=3 prov128 verify_par NV=18          0.889 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=19 blocks=1    105.879 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=19 blocks=1      0.941 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=20 blocks=3    233.971 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=20 blocks=3      1.026 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=21 blocks=6    515.036 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=21 blocks=6      1.092 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=22 blocks=13   1106.096 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=22 blocks=13      1.173 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=23 blocks=27   2364.572 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=23 blocks=27      1.241 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=24 blocks=55   5092.116 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=24 blocks=55      1.288 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=25 blocks=111  11407.589 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=25 blocks=111      1.385 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 prove_par NV=26 blocks=222  24046.525 ms
+HP DF MamaBear SHA256 Par Ext3 split=3 prov128 verify_par NV=26 blocks=222      1.426 ms
+
+HP DF MamaBear Ext3 split=4 prov128 prove NV=18                 120.932 ms
+HP DF MamaBear Ext3 split=4 prov128 verify NV=18                  1.522 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=19 blocks=1    256.052 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=19 blocks=1      1.596 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=20 blocks=3    535.357 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=20 blocks=3      1.690 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=21 blocks=6   1220.256 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=21 blocks=6      1.767 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=22 blocks=13   3064.948 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=22 blocks=13      1.956 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=23 blocks=27   6886.848 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=23 blocks=27      2.028 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=24 blocks=55  15025.666 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=24 blocks=55      2.144 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=25 blocks=111  33332.843 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=25 blocks=111      2.171 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 prove NV=26 blocks=222  73157.769 ms
+HP DF MamaBear SHA256 Ext3 split=4 prov128 verify NV=26 blocks=222      2.270 ms
+
+HP DF MamaBear Par Ext3 split=4 prov128 prove_par NV=18          52.465 ms
+HP DF MamaBear Par Ext3 split=4 prov128 verify_par NV=18          1.169 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=19 blocks=1    104.536 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=19 blocks=1      1.233 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=20 blocks=3    207.737 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=20 blocks=3      1.319 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=21 blocks=6    478.801 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=21 blocks=6      1.374 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=22 blocks=13   1030.679 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=22 blocks=13      1.438 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=23 blocks=27   2111.378 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=23 blocks=27      1.520 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=24 blocks=55   4493.271 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=24 blocks=55      1.597 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=25 blocks=111   9693.891 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=25 blocks=111      1.643 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 prove_par NV=26 blocks=222  21296.397 ms
+HP DF MamaBear SHA256 Par Ext3 split=4 prov128 verify_par NV=26 blocks=222      1.705 ms
+
+HP DF MamaBear Ext3 split=5 prov128 prove NV=18                 103.421 ms
+HP DF MamaBear Ext3 split=5 prov128 verify NV=18                  2.306 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=19 blocks=1    255.224 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=19 blocks=1      2.419 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=20 blocks=3    519.300 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=20 blocks=3      2.490 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=21 blocks=6   1143.363 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=21 blocks=6      2.603 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=22 blocks=13   2720.191 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=22 blocks=13      2.672 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=23 blocks=27   6373.299 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=23 blocks=27      2.794 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=24 blocks=55  14371.369 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=24 blocks=55      2.896 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=25 blocks=111  31763.070 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=25 blocks=111      3.172 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=26 blocks=222  68770.446 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=26 blocks=222      3.063 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 prove NV=27 blocks=444 144144.583 ms
+HP DF MamaBear SHA256 Ext3 split=5 prov128 verify NV=27 blocks=444      3.259 ms
+
+HP DF MamaBear Par Ext3 split=5 prov128 prove_par NV=18          49.112 ms
+HP DF MamaBear Par Ext3 split=5 prov128 verify_par NV=18          1.751 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=19 blocks=1     97.318 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=19 blocks=1      1.839 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=20 blocks=3    195.699 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=20 blocks=3      1.897 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=21 blocks=6    436.462 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=21 blocks=6      1.967 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=22 blocks=13    960.097 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=22 blocks=13      2.071 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=23 blocks=27   1979.068 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=23 blocks=27      2.146 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=24 blocks=55   4136.072 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=24 blocks=55      2.169 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=25 blocks=111   8705.278 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=25 blocks=111      2.181 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 prove_par NV=26 blocks=222  19098.355 ms
+HP DF MamaBear SHA256 Par Ext3 split=5 prov128 verify_par NV=26 blocks=222      2.278 ms

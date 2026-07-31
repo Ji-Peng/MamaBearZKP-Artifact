@@ -1,0 +1,18 @@
+# Workspace-wide rustc flags.
+#
+# This project is heavily optimized for AVX-512IFMA (MamaBear) and AVX-512F
+# (plonky3 BabyBear), and the compile-time feature gates in our packed field
+# code (arithmetic/src/field/mamabear.rs, arithmetic/benches/babybear_avx512_bench.rs)
+# silently select narrower fallbacks when the AVX-512 target features are not
+# enabled. Pinning `target-cpu=native` here ensures:
+#
+#   - rust-analyzer / IDE `cargo check` picks the right Packing types (e.g.
+#     `<BabyBear as p3_field::Field>::Packing` resolves to the 16-lane
+#     PackedBabyBearAVX512, so const-asserts like `WIDTH == 16` pass).
+#   - manual `cargo {build,test,bench}` commands behave the same as the
+#     `RUSTFLAGS="-C target-cpu=native"` prefix used across bench scripts.
+#
+# The shell-level `RUSTFLAGS` env var still takes precedence over this config, 
+# so existing workflows are unchanged.
+[build]
+rustflags = ["-C", "target-cpu=native"]

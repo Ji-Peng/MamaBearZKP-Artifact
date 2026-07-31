@@ -1,0 +1,137 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-29T11:39:01+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       zc,own pc,own df,own hp_df,own mem
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits  <- what the name PROV_QUERY128 refers to
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5  (falls ~1 bit per +1 nv)
+# fri-commit-thm: bad-folding-challenge count is O(n) per Ben-Sasson-Carmon-Haboeck-Kopparty-Saraf, STOC 2026, Thm 1.5 (proximity loss 0, explicit constant); supersedes the O(n^2) count of BCIKS FOCS 2020 + Haboeck 2022, which gave C=83.0 at nv=19 for MamaBear Ext3.  Caveat: STOC states the line case; the affine-space (batched) constant is to be confirmed against the full version.
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+# ---- provenance ----
+# The MamaBear row blocks below were measured by the run described in this
+# header. The Goldilocks and BabyBear blocks are carried over unchanged from
+# the 2026-07-27 capture on the same machine: this codebase has no
+# multithreaded Goldilocks/BabyBear prover, so those rows are single-threaded
+# and the parallel worker count cannot move them. They were left in place
+# rather than re-measured so the re-run could target only what changed.
+# A full ./reproduce_addmul.sh all regenerates every block in one capture.
+# ============================
+
+Zerocheck BabyBearExt4 NV=18                                    200.527 ms
+Zerocheck BabyBearExt4 NV=19                                    399.126 ms
+Zerocheck BabyBearExt4 NV=20                                    801.271 ms
+Zerocheck BabyBearExt4 NV=21                                   1412.174 ms
+Zerocheck BabyBearExt4 NV=22                                   2814.952 ms
+Zerocheck BabyBearExt4 NV=23                                   5658.397 ms
+Zerocheck BabyBearExt4 NV=24                                  11460.117 ms
+Zerocheck BabyBearExt4 NV=25                                  22517.615 ms
+Zerocheck BabyBearExt4 NV=26                                  45722.964 ms
+Zerocheck BabyBearExt4 NV=27                                  90999.834 ms
+Zerocheck BabyBearExt4 NV=28                                 183772.921 ms
+
+Zerocheck Goldilocks64Ext NV=18                                 233.837 ms
+Zerocheck Goldilocks64Ext NV=19                                 459.684 ms
+Zerocheck Goldilocks64Ext NV=20                                 912.152 ms
+Zerocheck Goldilocks64Ext NV=21                                1639.781 ms
+Zerocheck Goldilocks64Ext NV=22                                3361.040 ms
+Zerocheck Goldilocks64Ext NV=23                                6557.246 ms
+Zerocheck Goldilocks64Ext NV=24                               13272.681 ms
+Zerocheck Goldilocks64Ext NV=25                               26410.458 ms
+Zerocheck Goldilocks64Ext NV=26                               52735.645 ms
+Zerocheck Goldilocks64Ext NV=27                              105764.381 ms
+Zerocheck Goldilocks64Ext NV=28                              210805.609 ms
+
+Legacy Ext3 NV=18                                                 9.354 ms
+Legacy Ext3 NV=19                                                21.641 ms
+Legacy Ext3 NV=20                                                38.021 ms
+Legacy Ext3 NV=21                                                81.054 ms
+Legacy Ext3 NV=22                                               175.968 ms
+Legacy Ext3 NV=23                                               351.129 ms
+Legacy Ext3 NV=24                                               747.925 ms
+Legacy Ext3 NV=25                                              1458.122 ms
+Legacy Ext3 NV=26                                              2946.343 ms
+Legacy Ext3 NV=27                                              5883.878 ms
+Legacy Ext3 NV=28                                             11588.022 ms
+Optimized Ext3 ell0=1 NV=18                                       5.896 ms
+Optimized Ext3 ell0=1 NV=19                                      14.559 ms
+Optimized Ext3 ell0=1 NV=20                                      29.779 ms
+Optimized Ext3 ell0=1 NV=21                                      60.059 ms
+Optimized Ext3 ell0=1 NV=22                                     129.765 ms
+Optimized Ext3 ell0=1 NV=23                                     249.970 ms
+Optimized Ext3 ell0=1 NV=24                                     549.304 ms
+Optimized Ext3 ell0=1 NV=25                                    1034.969 ms
+Optimized Ext3 ell0=1 NV=26                                    2132.163 ms
+Optimized Ext3 ell0=1 NV=27                                    4210.545 ms
+Optimized Ext3 ell0=1 NV=28                                    8463.469 ms
+Optimized Ext3 Par ell0=1 NV=18                                   5.802 ms
+Optimized Ext3 Par ell0=1 NV=19                                  13.966 ms
+Optimized Ext3 Par ell0=1 NV=20                                  29.868 ms
+Optimized Ext3 Par ell0=1 NV=21                                  61.680 ms
+Optimized Ext3 Par ell0=1 NV=22                                 143.620 ms
+Optimized Ext3 Par ell0=1 NV=23                                 269.126 ms
+Optimized Ext3 Par ell0=1 NV=24                                 519.880 ms
+Optimized Ext3 Par ell0=1 NV=25                                 953.548 ms
+Optimized Ext3 Par ell0=1 NV=26                                1953.986 ms
+Optimized Ext3 Par ell0=1 NV=27                                3857.091 ms
+Optimized Ext3 Par ell0=1 NV=28                                7692.480 ms
+Optimized Ext3 ell0=2 NV=18                                       5.548 ms
+Optimized Ext3 ell0=2 NV=19                                      11.610 ms
+Optimized Ext3 ell0=2 NV=20                                      23.847 ms
+Optimized Ext3 ell0=2 NV=21                                      48.323 ms
+Optimized Ext3 ell0=2 NV=22                                     122.220 ms
+Optimized Ext3 ell0=2 NV=23                                     236.909 ms
+Optimized Ext3 ell0=2 NV=24                                     459.884 ms
+Optimized Ext3 ell0=2 NV=25                                     977.407 ms
+Optimized Ext3 ell0=2 NV=26                                    1931.321 ms
+Optimized Ext3 ell0=2 NV=27                                    3822.798 ms
+Optimized Ext3 ell0=2 NV=28                                    7705.745 ms
+Optimized Ext3 Par ell0=2 NV=18                                   4.145 ms
+Optimized Ext3 Par ell0=2 NV=19                                   7.380 ms
+Optimized Ext3 Par ell0=2 NV=20                                  14.261 ms
+Optimized Ext3 Par ell0=2 NV=21                                  31.100 ms
+Optimized Ext3 Par ell0=2 NV=22                                  83.821 ms
+Optimized Ext3 Par ell0=2 NV=23                                 165.888 ms
+Optimized Ext3 Par ell0=2 NV=24                                 324.608 ms
+Optimized Ext3 Par ell0=2 NV=25                                 572.494 ms
+Optimized Ext3 Par ell0=2 NV=26                                1118.719 ms
+Optimized Ext3 Par ell0=2 NV=27                                2299.616 ms
+Optimized Ext3 Par ell0=2 NV=28                                4464.851 ms
+Optimized Ext3 ell0=3 NV=18                                       8.008 ms
+Optimized Ext3 ell0=3 NV=19                                      16.490 ms
+Optimized Ext3 ell0=3 NV=20                                      35.210 ms
+Optimized Ext3 ell0=3 NV=21                                      72.555 ms
+Optimized Ext3 ell0=3 NV=22                                     164.574 ms
+Optimized Ext3 ell0=3 NV=23                                     321.184 ms
+Optimized Ext3 ell0=3 NV=24                                     644.698 ms
+Optimized Ext3 ell0=3 NV=25                                    1269.163 ms
+Optimized Ext3 ell0=3 NV=26                                    2601.470 ms
+Optimized Ext3 ell0=3 NV=27                                    5197.000 ms
+Optimized Ext3 ell0=3 NV=28                                   10231.964 ms
+Optimized Ext3 Par ell0=3 NV=18                                   8.057 ms
+Optimized Ext3 Par ell0=3 NV=19                                  16.449 ms
+Optimized Ext3 Par ell0=3 NV=20                                  35.025 ms
+Optimized Ext3 Par ell0=3 NV=21                                  72.766 ms
+Optimized Ext3 Par ell0=3 NV=22                                 164.275 ms
+Optimized Ext3 Par ell0=3 NV=23                                 367.173 ms
+Optimized Ext3 Par ell0=3 NV=24                                 728.627 ms
+Optimized Ext3 Par ell0=3 NV=25                                1296.096 ms
+Optimized Ext3 Par ell0=3 NV=26                                2617.296 ms
+Optimized Ext3 Par ell0=3 NV=27                                5197.228 ms
+Optimized Ext3 Par ell0=3 NV=28                               10295.494 ms

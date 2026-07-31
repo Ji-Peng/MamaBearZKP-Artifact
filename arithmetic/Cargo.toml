@@ -1,0 +1,37 @@
+[package]
+name = "arithmetic"
+version = "0.1.0"
+edition = "2021"
+# Disable auto-detection of benches/*.rs so helper modules (measure.rs, utils.rs)
+# are not compiled as standalone bench targets; only the explicit [[bench]]
+# entries below are built.
+autobenches = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = {version = "0.9.2", default-features = false, features = ["small_rng"]}
+ark-ec = "0.4"
+ark-ff = "0.4"
+ark-bn254 = "0.4"
+p3-baby-bear = { git = "https://github.com/Plonky3/Plonky3.git", rev = "0f87f2b543a01880274965c410bf804c124f5046" }
+p3-field = { git = "https://github.com/Plonky3/Plonky3.git", rev = "0f87f2b543a01880274965c410bf804c124f5046" }
+
+[dev-dependencies]
+
+[[bench]]
+name = "goldilocks_bench"
+harness = false
+
+[[bench]]
+name = "mamabear_bench"
+harness = false
+
+[[bench]]
+name = "babybear_bench"
+harness = false
+
+[[bench]]
+name = "babybear_avx512_bench"
+harness = false
+

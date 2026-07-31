@@ -1,0 +1,238 @@
+//! hp_df_babybear: custom warmup+median harness (replaces criterion).
+//!
+//! Random-circuit HyperPlonk + DeepFold (BabyBear).
+//!
+//! Env vars:
+//!   BENCH_NV_MIN / BENCH_NV_MAX  inclusive NV range (default 18..=18)
+//!   BENCH_SECURITY=conj96|prov97|prov128  FRI security level (DEFAULT prov128)
+//!   BENCH_WARMUP=N    warmup iterations (default 1)
+//!   BENCH_SAMPLES=N   measured iterations (default 5, must be >= 1)
+//!   BENCH_OUTPUT_FILE=PATH  if set, append one line per cell to PATH
+
+use std::fs::OpenOptions;
+use std::hint::black_box;
+use std::io::Write as _;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use arithmetic::{
+    field::{
+        babybear::{BabyBearExt4, BabyBearField},
+        Field,
+    },
+    mul_group::Radix2Group,
+};
+use hyperplonk::{circuit::Circuit, prover::Prover, verifier::Verifier};
+use poly_commit::deepfold::{DeepFoldParam, DeepFoldProver, DeepFoldVerifier};
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use util::fiat_shamir::Proof;
+
+type DeepFoldBabyBearProver = Prover<BabyBearExt4, DeepFoldProver<BabyBearExt4>>;
+type DeepFoldBabyBearVerifier = Verifier<BabyBearExt4, DeepFoldVerifier<BabyBearExt4>>;
+
+use util::params::{
+    babybear::{QUERY_NUM_CONJ96, QUERY_NUM_PROV_QUERY128},
+    CODE_RATE_LOG, QUERY_NUM_PROV_QUERY97,
+};
+
+// ---------------------------------------------------------------------------
+// Shared harness scaffold
+// ---------------------------------------------------------------------------
+
+fn env_usize(key: &str, default: usize) -> usize {
+    std::env::var(key)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(default)
+}
+
+static MEASURE_CFG: OnceLock<(usize, usize)> = OnceLock::new();
+static OUTPUT_FILE: OnceLock<Option<Mutex<std::fs::File>>> = OnceLock::new();
+
+fn init_output_file() {
+    let file = std::env::var("BENCH_OUTPUT_FILE").ok().map(|p| {
+        let f = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&p)
+            .unwrap_or_else(|e| panic!("BENCH_OUTPUT_FILE={p:?} open failed: {e}"));
+        Mutex::new(f)
+    });
+    OUTPUT_FILE
+        .set(file)
+        .ok()
+        .expect("OUTPUT_FILE already initialized");
+}
+
+fn measure_cfg() -> (usize, usize) {
+    *MEASURE_CFG.get().expect("MEASURE_CFG not initialized")
+}
+
+fn record(line: &str) {
+    println!("{line}");
+    if let Some(Some(m)) = OUTPUT_FILE.get() {
+        let mut f = m.lock().unwrap();
+        let _ = writeln!(f, "{line}");
+        let _ = f.flush();
+    }
+}
+
+fn measure<F: FnMut() -> Duration>(label: &str, mut one_sample: F) {
+    let (warmup, samples) = measure_cfg();
+    for _ in 0..warmup {
+        let _ = one_sample();
+    }
+    let mut times: Vec<Duration> = (0..samples).map(|_| one_sample()).collect();
+    times.sort();
+    let median_ms = times[samples / 2].as_secs_f64() * 1000.0;
+    record(&format!("{label:<60} {median_ms:>10.3} ms"));
+}
+
+#[derive(Clone, Copy)]
+enum SecurityLevel {
+    Conj96,
+    Prov97,
+    Prov128,
+}
+
+impl SecurityLevel {
+    fn label(self) -> &'static str {
+        match self {
+            SecurityLevel::Conj96 => "conj96",
+            SecurityLevel::Prov97 => "prov97",
+            SecurityLevel::Prov128 => "prov128",
+        }
+    }
+    fn query_num(self) -> usize {
+        match self {
+            SecurityLevel::Conj96 => QUERY_NUM_CONJ96,
+            SecurityLevel::Prov97 => QUERY_NUM_PROV_QUERY97,
+            SecurityLevel::Prov128 => QUERY_NUM_PROV_QUERY128,
+        }
+    }
+}
+
+fn select_security() -> SecurityLevel {
+    match std::env::var("BENCH_SECURITY").ok().as_deref() {
+        Some("conj96") => SecurityLevel::Conj96,
+        Some("prov97") => SecurityLevel::Prov97,
+        Some("prov128") => SecurityLevel::Prov128,
+        // prov128 is the DEFAULT (2026-07 refactor). An UNSET variable must yield
+        // the paper regime, PROV_QUERY128 (88 queries + 16 grinding at rate 1/8);
+        // it used to fall through to conj96 (32 queries, no grinding), which
+        // silently understated every number by measuring a weaker instance.
+        None => SecurityLevel::Prov128,
+        // An unrecognised value is a typo, not a request for a default. Failing
+        // loudly here is the whole point: `BENCH_SECURITY=prov` silently mapping
+        // to some regime is how a mis-measured run reaches a results file.
+        Some(other) => panic!(
+            "BENCH_SECURITY={other:?} is not one of conj96|prov97|prov128 \
+             (unset means prov128)"
+        ),
+    }
+}
+
+struct BenchCase {
+    nv: usize,
+    pp: DeepFoldParam<BabyBearExt4>,
+    prover: DeepFoldBabyBearProver,
+    verifier: DeepFoldBabyBearVerifier,
+    witness: [Vec<BabyBearField>; 3],
+    proof: Proof,
+}
+
+fn build_mult_subgroups(nv: usize) -> Vec<Radix2Group<BabyBearField>> {
+    let log_n = (nv + CODE_RATE_LOG) as u32;
+    let mut mult_subgroups = vec![Radix2Group::<BabyBearField>::new(log_n)];
+    for i in 1..nv {
+        mult_subgroups.push(mult_subgroups[i - 1].exp(2));
+    }
+    mult_subgroups
+}
+
+fn build_case(nv: usize, query_num: usize) -> BenchCase {
+    let mut rng = SmallRng::seed_from_u64(1);
+    let num_gates = 1u32 << nv;
+    let circuit = Circuit::<BabyBearExt4> {
+        permutation: [
+            (0..num_gates).map(|x| x.into()).collect(),
+            (0..num_gates).map(|x| (x + (1 << 29)).into()).collect(),
+            (0..num_gates).map(|x| (x + (1 << 30)).into()).collect(),
+        ],
+        selector: (0..num_gates).map(|x| (x & 1).into()).collect(),
+    };
+    let pp = DeepFoldParam::<BabyBearExt4> {
+        mult_subgroups: build_mult_subgroups(nv),
+        variable_num: nv,
+        query_num,
+    };
+    let (pk, vk) = circuit.setup::<DeepFoldProver<_>, DeepFoldVerifier<_>>(&pp, &pp);
+    let prover = Prover { prover_key: pk };
+    let verifier = Verifier { verifier_key: vk };
+    let a = (0..num_gates)
+        .map(|_| BabyBearField::random(&mut rng))
+        .collect::<Vec<_>>();
+    let b = (0..num_gates)
+        .map(|_| BabyBearField::random(&mut rng))
+        .collect::<Vec<_>>();
+    let c = (0..num_gates)
+        .map(|i| {
+            let i = i as usize;
+            let s = circuit.selector[i];
+            -((BabyBearField::one() - s) * (a[i] + b[i]) + s * a[i] * b[i])
+        })
+        .collect::<Vec<_>>();
+    let witness = [a, b, c];
+    let proof = prover.prove(&pp, nv, witness.clone());
+    assert!(verifier.verify(&pp, nv, proof.clone()));
+    BenchCase {
+        nv,
+        pp,
+        prover,
+        verifier,
+        witness,
+        proof,
+    }
+}
+
+fn bench_case(case: &BenchCase, sec_label: &str) {
+    measure(
+        &format!("HP DF BabyBear {sec_label} prove NV={}", case.nv),
+        || {
+            let witness = case.witness.clone();
+            let start = Instant::now();
+            black_box(case.prover.prove(&case.pp, case.nv, witness));
+            start.elapsed()
+        },
+    );
+
+    measure(
+        &format!("HP DF BabyBear {sec_label} verify NV={}", case.nv),
+        || {
+            let proof = case.proof.clone();
+            let start = Instant::now();
+            black_box(case.verifier.verify(&case.pp, case.nv, proof));
+            start.elapsed()
+        },
+    );
+}
+
+fn main() {
+    let nv_min = env_usize("BENCH_NV_MIN", 18);
+    let nv_max = env_usize("BENCH_NV_MAX", 18);
+    let sec = select_security();
+
+    let warmup = env_usize("BENCH_WARMUP", 1);
+    let samples = env_usize("BENCH_SAMPLES", 5);
+    assert!(samples >= 1, "BENCH_SAMPLES must be >= 1 (got {samples})");
+    MEASURE_CFG
+        .set((warmup, samples))
+        .expect("MEASURE_CFG set more than once");
+    init_output_file();
+
+    for nv in nv_min..=nv_max {
+        let case = build_case(nv, sec.query_num());
+        bench_case(&case, sec.label());
+    }
+}

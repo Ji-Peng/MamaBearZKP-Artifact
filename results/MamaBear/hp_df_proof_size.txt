@@ -1,0 +1,69 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-31T18:03:25+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       field grind circuit size
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+HP DF Goldilocks prov128 nv=18 prove                             395.11 KiB
+HP DF Goldilocks SHA256 prov128 nv=19 prove                      447.72 KiB
+HP DF Goldilocks SHA256 prov128 nv=20 prove                      498.41 KiB
+HP DF Goldilocks SHA256 prov128 nv=21 prove                      565.80 KiB
+HP DF Goldilocks SHA256 prov128 nv=22 prove                      620.20 KiB
+HP DF Goldilocks SHA256 prov128 nv=23 prove                      687.34 KiB
+HP DF Goldilocks SHA256 prov128 nv=24 prove                      756.78 KiB
+HP DF Babybear prov128 nv=18 prove                               389.43 KiB
+HP DF Babybear SHA256 prov128 nv=19 prove                        441.07 KiB
+HP DF Babybear SHA256 prov128 nv=20 prove                        489.98 KiB
+HP DF Babybear SHA256 prov128 nv=21 prove                        552.34 KiB
+HP DF Babybear SHA256 prov128 nv=22 prove                        624.84 KiB
+HP DF Babybear SHA256 prov128 nv=23 prove                        685.85 KiB
+HP DF Babybear SHA256 prov128 nv=24 prove                        753.73 KiB
+HP DF Mamabear prov128 split=3 nv=18 prove                       312.13 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=19 prove                344.33 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=20 prove                388.73 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=21 prove                428.80 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=22 prove                484.25 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=23 prove                529.12 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=24 prove                590.07 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=25 prove                645.42 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=26 prove                699.30 KiB
+HP DF Mamabear SHA256 prov128 split=3 nv=27 prove                774.31 KiB
+HP DF Mamabear prov128 split=4 nv=18 prove                       346.47 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=19 prove                377.13 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=20 prove                423.17 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=21 prove                461.78 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=22 prove                508.38 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=23 prove                558.66 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=24 prove                613.82 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=25 prove                654.96 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=26 prove                711.97 KiB
+HP DF Mamabear SHA256 prov128 split=4 nv=27 prove                782.07 KiB
+HP DF Mamabear prov128 split=5 nv=18 prove                       442.87 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=19 prove                475.82 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=20 prove                514.99 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=21 prove                549.26 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=22 prove                600.92 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=23 prove                654.54 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=24 prove                688.51 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=25 prove                747.54 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=26 prove                792.62 KiB
+HP DF Mamabear SHA256 prov128 split=5 nv=27 prove                848.94 KiB

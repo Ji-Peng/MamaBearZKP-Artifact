@@ -1,0 +1,15 @@
+[workspace]
+members = [
+    "arithmetic",
+    "poly_commit",
+    "hyperplonk",
+    "util"
+]
+exclude = [
+    "external",
+]
+resolver = "2"
+
+[profile.release]
+# full debug information
+debug = 2

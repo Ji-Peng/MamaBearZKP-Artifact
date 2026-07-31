@@ -1,0 +1,80 @@
+# ==== reproduce_addmul.sh run ====
+# timestamp:  2026-07-29T11:39:01+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       zc,own pc,own df,own hp_df,own mem
+# ---- SNARK configuration ----
+# backend:   MamaBear  P = 2^49 - 2^34 + 1 (49-bit Solinas), R = 2^52 Montgomery, AVX-512IFMA
+# extension: Ext3  F_p[X]/(X^3 - X - 1)  log2|F_ext| = 147.0
+# pcs:       DeepFold  rate 1/8 (CODE_RATE_LOG=3)  split=3
+# fri:       PROV_QUERY128  queries=88  grinding=16 bits  (m=3, 1.2776 bits/query)
+# fri-query: S_query = zeta_q + Q = 16 + 88*1.2776 = 128.4 bits  <- what the name PROV_QUERY128 refers to
+# fri-commit: C = log2|F_ext| - log2(n) - log2(log2 n) - log2(c_PG),  c_PG = 7928.7 (m=3, rate 1/8),  n = 2^(nv+3);  nv=19: C=107.6  nv=20: C=106.5  (falls ~1 bit per +1 nv)
+# fri-commit-thm: bad-folding-challenge count is O(n) per Ben-Sasson-Carmon-Haboeck-Kopparty-Saraf, STOC 2026, Thm 1.5 (proximity loss 0, explicit constant); supersedes the O(n^2) count of BCIKS FOCS 2020 + Haboeck 2022, which gave C=83.0 at nv=19 for MamaBear Ext3.  Caveat: STOC states the line case; the affine-space (batched) constant is to be confirmed against the full version.
+# fri-prov:  S_prov = min(C, S_query) = nv=19: 107.6 (commit-bound)  nv=20: 106.5 (commit-bound)  (adding queries cannot lift a commit-bound total)
+# piop-sec:  ~124-bit conjectured: the PIOP soundness error is Schwartz-Zippel over Ext3 (log2|F_ext| = 147), capped by the 2^-124 transcript-challenge budget
+# baselines: Goldilocks PROV_QUERY128 queries=101  BabyBear PROV_QUERY128 queries=101  (same rate 1/8, no grinding)
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+# ---- provenance ----
+# The MamaBear row blocks below were measured by the run described in this
+# header. The Goldilocks and BabyBear blocks are carried over unchanged from
+# the 2026-07-27 capture on the same machine: this codebase has no
+# multithreaded Goldilocks/BabyBear prover, so those rows are single-threaded
+# and the parallel worker count cannot move them. They were left in place
+# rather than re-measured so the re-run could target only what changed.
+# A full ./reproduce_addmul.sh all regenerates every block in one capture.
+# ============================
+
+ProdEqCheck BabyBear NV=18                                      488.286 ms
+ProdEqCheck BabyBear NV=19                                     1007.803 ms
+ProdEqCheck BabyBear NV=20                                     2014.319 ms
+ProdEqCheck BabyBear NV=21                                     4174.901 ms
+ProdEqCheck BabyBear NV=22                                     8239.309 ms
+ProdEqCheck BabyBear NV=23                                    15910.228 ms
+ProdEqCheck BabyBear NV=24                                    34071.363 ms
+ProdEqCheck BabyBear NV=25                                    67205.662 ms
+ProdEqCheck BabyBear NV=26                                   132539.083 ms
+ProdEqCheck BabyBear NV=27                                   265959.041 ms
+
+ProdEqCheck Goldilocks NV=18                                    578.720 ms
+ProdEqCheck Goldilocks NV=19                                   1137.493 ms
+ProdEqCheck Goldilocks NV=20                                   2327.823 ms
+ProdEqCheck Goldilocks NV=21                                   4660.347 ms
+ProdEqCheck Goldilocks NV=22                                   9497.176 ms
+ProdEqCheck Goldilocks NV=23                                  18644.451 ms
+ProdEqCheck Goldilocks NV=24                                  38413.116 ms
+ProdEqCheck Goldilocks NV=25                                  77295.987 ms
+ProdEqCheck Goldilocks NV=26                                 149835.099 ms
+ProdEqCheck Goldilocks NV=27                                 304078.674 ms
+
+ProdEqCheck PerWire Ext3 NV=18                                   27.840 ms
+ProdEqCheck PerWirePar Ext3 NV=18                                18.265 ms
+ProdEqCheck PerWire Ext3 NV=19                                   35.642 ms
+ProdEqCheck PerWirePar Ext3 NV=19                                24.281 ms
+ProdEqCheck PerWire Ext3 NV=20                                   71.086 ms
+ProdEqCheck PerWirePar Ext3 NV=20                                63.303 ms
+ProdEqCheck PerWire Ext3 NV=21                                  239.214 ms
+ProdEqCheck PerWirePar Ext3 NV=21                               157.952 ms
+ProdEqCheck PerWire Ext3 NV=22                                  523.880 ms
+ProdEqCheck PerWirePar Ext3 NV=22                               336.941 ms
+ProdEqCheck PerWire Ext3 NV=23                                 1119.294 ms
+ProdEqCheck PerWirePar Ext3 NV=23                               686.968 ms
+ProdEqCheck PerWire Ext3 NV=24                                 2194.210 ms
+ProdEqCheck PerWirePar Ext3 NV=24                              1319.980 ms
+ProdEqCheck PerWire Ext3 NV=25                                 4346.292 ms
+ProdEqCheck PerWirePar Ext3 NV=25                              2567.096 ms
+ProdEqCheck PerWire Ext3 NV=26                                 8882.700 ms
+ProdEqCheck PerWirePar Ext3 NV=26                              5119.917 ms
+ProdEqCheck PerWire Ext3 NV=27                                17675.870 ms
+ProdEqCheck PerWirePar Ext3 NV=27                             10157.454 ms
+ProdEqCheck PerWire Ext3 NV=28                                35128.519 ms
+ProdEqCheck PerWirePar Ext3 NV=28                             20421.110 ms

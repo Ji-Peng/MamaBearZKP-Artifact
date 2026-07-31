@@ -1,0 +1,397 @@
+\documentclass[sigconf]{acmart}
+\usepackage{amsmath,amsfonts}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{tabularray}
+\usepackage{float}
+\UseTblrLibrary{booktabs}
+\newcommand{\F}{\mathbb{F}}
+\setcopyright{none}
+\settopmatter{printacmref=false, printccs=false, printfolios=true}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+\providecommand{\shorttitle}[1]{}
+\shorttitle{}
+\begin{document}
+
+\begin{center}
+\textbf{\large MamaBearZKP artifact --- measured tables}
+\end{center}
+
+\noindent
+Every table below is generated from the files under \texttt{results/} by
+\texttt{plot\_tables.py}, and is \textbf{numbered and ordered as in the paper}:
+Table~6 here is Table~6 there. Paper Tables~2, 3, 7 and~8 are descriptive or
+analytically derived and correspond to no benchmark run, so the numbering skips
+them. Each table starts a new page, in paper order.
+\clearpage
+% paper Table 1
+\setcounter{table}{0}
+\begin{table}[!t]
+\centering
+\caption{Representative end-to-end prover times. Baseline is Goldilocks; both
+``This work'' columns are MamaBear $\F_{p^3}$ with a 5-level FFT split. Rows are
+$\mu \in \{19, 21, 23\}$ of Table~\ref{tab:hp-df-prove-prov128}.}
+\label{tab:intro-hp-df-teaser}
+\begin{tblr}{
+        width = 0.98\linewidth,
+        colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+        row{1} = {font=\bfseries}, rowsep = 1.5pt,
+    }
+    \toprule
+    $\mu$ & {Baseline} & This work & Speed-up & {This work\\Parallel} & Speed-up \\
+    \midrule
+    19 & 4.34 s & 0.26 s & 17x & 97.3 ms & 45x \\
+    21 & 18.61 s & 1.14 s & 16x & 0.44 s & 42x \\
+    23 & 75.49 s & 6.37 s & 12x & 1.98 s & 38x \\
+    \bottomrule
+\end{tblr}
+\end{table}
+\clearpage
+% paper Table 4
+\setcounter{table}{3}
+\begin{table*}[t]
+\centering
+\caption{ZeroCheck and ProductCheck time across circuit sizes $2^{\mu}$ for $\mu = 18$ to $28$. Goldilocks and BabyBear serve as baselines. ``M.\ vs.\ G./B.'' reports the MamaBear speedup over Goldilocks / BabyBear. ``-Par'' columns use 8 threads. ``--'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:zerocheck-prodcheck}
+\begin{subtable}[t]{0.49\textwidth}
+\centering
+\caption{ZeroCheck time over $\F_{p^3}$ with $\ell_0{=}2$ (\S\ref{sec:zerocheck-ell0}).}
+\label{tab:zerocheck}
+\small
+\begin{tblr}{
+    width = \linewidth,
+    colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+    row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+    colsep = 3pt,
+    cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m},
+    cell{1}{4} = {c=2}{c,m}, cell{1}{6} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & {Gold.\\$\F_{p^2}$} & {Baby.\\$\F_{p^4}$} & {MamaBear $\F_{p^3}$} & & {MamaBear-Par $\F_{p^3}$} & \\
+& & & Time & {M.\ vs.\ G./B.} & Time & {M.\ vs.\ G./B.} \\
+\midrule
+18 & 0.23 s & 0.20 s & 5.5 ms & 42x/36x & 4.1 ms & 56x/49x \\
+19 & 0.46 s & 0.40 s & 11.6 ms & 40x/34x & 7.4 ms & 62x/54x \\
+20 & 0.91 s & 0.80 s & 23.8 ms & 38x/34x & 14.3 ms & 64x/56x \\
+21 & 1.64 s & 1.41 s & 48.3 ms & 34x/29x & 31.1 ms & 53x/45x \\
+22 & 3.36 s & 2.81 s & 0.12 s & 28x/23x & 83.8 ms & 40x/34x \\
+23 & 6.56 s & 5.66 s & 0.24 s & 27x/24x & 0.17 s & 39x/33x \\
+24 & 13.27 s & 11.46 s & 0.46 s & 29x/25x & 0.32 s & 41x/36x \\
+25 & 26.41 s & 22.52 s & 0.98 s & 27x/23x & 0.57 s & 46x/40x \\
+26 & 52.74 s & 45.72 s & 1.93 s & 27x/24x & 1.12 s & 47x/41x \\
+27 & 105.8 s & 91.00 s & 3.82 s & 28x/24x & 2.30 s & 46x/40x \\
+28 & 210.8 s & 183.8 s & 7.71 s & 27x/24x & 4.46 s & 47x/41x \\
+\bottomrule
+\end{tblr}
+
+\end{subtable}\hfill
+\begin{subtable}[t]{0.49\textwidth}
+\centering
+\caption{ProductCheck time using the per-wire design (\S\ref{sec:perwire}) over $\F_{p^3}$.}
+\label{tab:prodcheck}
+\small
+\begin{tblr}{
+    width = \linewidth,
+    colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+    row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+    colsep = 3pt,
+    cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m},
+    cell{1}{4} = {c=2}{c,m}, cell{1}{6} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & {Gold.\\$\F_{p^2}$} & {Baby.\\$\F_{p^4}$} & {MamaBear $\F_{p^3}$} & & {MamaBear-Par $\F_{p^3}$} & \\
+& & & Time & {M.\ vs.\ G./B.} & Time & {M.\ vs.\ G./B.} \\
+\midrule
+18 & 0.58 s & 0.49 s & 27.8 ms & 21x/18x & 18.3 ms & 32x/27x \\
+19 & 1.14 s & 1.01 s & 35.6 ms & 32x/28x & 24.3 ms & 47x/42x \\
+20 & 2.33 s & 2.01 s & 71.1 ms & 33x/28x & 63.3 ms & 37x/32x \\
+21 & 4.66 s & 4.17 s & 0.24 s & 19x/17x & 0.16 s & 29x/26x \\
+22 & 9.50 s & 8.24 s & 0.52 s & 18x/16x & 0.34 s & 28x/24x \\
+23 & 18.64 s & 15.91 s & 1.12 s & 17x/14x & 0.69 s & 27x/23x \\
+24 & 38.41 s & 34.07 s & 2.19 s & 18x/16x & 1.32 s & 29x/26x \\
+25 & 77.30 s & 67.21 s & 4.35 s & 18x/15x & 2.57 s & 30x/26x \\
+26 & 149.8 s & 132.5 s & 8.88 s & 17x/15x & 5.12 s & 29x/26x \\
+27 & 304.1 s & 266.0 s & 17.68 s & 17x/15x & 10.16 s & 30x/26x \\
+28 & -- & -- & 35.13 s & --/-- & 20.42 s & --/-- \\
+\bottomrule
+\end{tblr}
+
+\end{subtable}
+\end{table*}
+\clearpage
+% paper Table 5
+\setcounter{table}{4}
+\begin{table*}[t]
+\centering
+\caption{DeepFold performance across circuit sizes $2^{\mu}$ for $\mu = 18$ to $27$. Goldilocks and BabyBear serve as baselines. ``M.\ vs.\ G./B.'' reports the MamaBear speedup over Goldilocks / BabyBear. ``-Par'' columns use 8 threads. Our MamaBear implementations use 5-level splitting FFT. ``--'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:deepfold-commit-open}
+\begin{subtable}[t]{0.49\textwidth}
+\centering
+\caption{DeepFold-Commit time.}
+\label{tab:deepfold-commit}
+\small
+\begin{tblr}{
+    width = \linewidth,
+    colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+    row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+    colsep = 3pt,
+    cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m},
+    cell{1}{4} = {c=2}{c,m}, cell{1}{6} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & {Gold.\\$\F_{p^2}$} & {Baby.\\$\F_{p^4}$} & {MamaBear $\F_{p^3}$} & & {MamaBear-Par $\F_{p^3}$} & \\
+& & & Time & {M.\ vs.\ G./B.} & Time & {M.\ vs.\ G./B.} \\
+\midrule
+18 & 0.65 s & 0.64 s & 45.1 ms & 14x/14x & 8.6 ms & 76x/74x \\
+19 & 1.46 s & 1.37 s & 0.10 s & 15x/14x & 18.1 ms & 81x/76x \\
+20 & 2.93 s & 2.83 s & 0.23 s & 13x/12x & 40.2 ms & 73x/70x \\
+21 & 6.08 s & 5.84 s & 0.51 s & 12x/11x & 0.10 s & 61x/58x \\
+22 & 12.23 s & 11.94 s & 1.19 s & 10x/10x & 0.23 s & 53x/52x \\
+23 & 24.82 s & 24.38 s & 3.19 s & 8x/8x & 0.53 s & 47x/46x \\
+24 & 50.32 s & 49.80 s & 7.50 s & 7x/7x & 1.18 s & 43x/42x \\
+25 & -- & -- & 17.01 s & --/-- & 2.95 s & --/-- \\
+26 & -- & -- & 40.03 s & --/-- & 7.18 s & --/-- \\
+27 & -- & -- & 92.34 s & --/-- & 17.81 s & --/-- \\
+\bottomrule
+\end{tblr}
+
+\end{subtable}\hfill
+\begin{subtable}[t]{0.49\textwidth}
+\centering
+\caption{DeepFold-Open time.}
+\label{tab:deepfold-open-prov128}
+\small
+\begin{tblr}{
+    width = \linewidth,
+    colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+    row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+    colsep = 3pt,
+    cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m},
+    cell{1}{4} = {c=2}{c,m}, cell{1}{6} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & {Gold.\\$\F_{p^2}$} & {Baby.\\$\F_{p^4}$} & {MamaBear $\F_{p^3}$} & & {MamaBear-Par $\F_{p^3}$} & \\
+& & & Time & {M.\ vs.\ G./B.} & Time & {M.\ vs.\ G./B.} \\
+\midrule
+18 & 0.59 s & 0.52 s & 31.5 ms & 19x/17x & 17.7 ms & 33x/29x \\
+19 & 1.27 s & 1.10 s & 63.9 ms & 20x/17x & 34.5 ms & 37x/32x \\
+20 & 2.70 s & 2.47 s & 0.13 s & 21x/19x & 68.8 ms & 39x/36x \\
+21 & 5.47 s & 4.96 s & 0.27 s & 20x/18x & 0.13 s & 42x/38x \\
+22 & 11.20 s & 10.21 s & 0.58 s & 19x/18x & 0.25 s & 45x/41x \\
+23 & 22.49 s & 20.46 s & 1.17 s & 19x/17x & 0.50 s & 45x/41x \\
+24 & 45.21 s & 40.88 s & 2.54 s & 18x/16x & 1.01 s & 45x/40x \\
+25 & -- & -- & 5.39 s & --/-- & 2.10 s & --/-- \\
+26 & -- & -- & 11.11 s & --/-- & 4.16 s & --/-- \\
+27 & -- & -- & 22.38 s & --/-- & 8.37 s & --/-- \\
+\bottomrule
+\end{tblr}
+
+\end{subtable}
+\end{table*}
+\clearpage
+% paper Table 6
+\setcounter{table}{5}
+%\begin{noIndentBlock}
+\begin{table*}[t]
+\centering
+\caption{HyperPlonk--DeepFold prover time across circuit sizes $2^{\mu}$ for $\mu = 18$ to $27$. Goldilocks, BabyBear, and Plonky3 serve as baselines. ``M.\ vs.\ G./B./P.'' reports the MamaBear speedup over Goldilocks / BabyBear / Plonky3. ``-Par'' columns use 8 threads. Our MamaBear implementations use 5-level splitting FFT. ``-'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:hp-df-prove-prov128}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+  row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+  cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m}, cell{1}{4} = {r=2}{c,m}, cell{1}{5} = {r=2}{c,m},
+  cell{1}{6} = {c=2}{c,m}, cell{1}{8} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & {Goldilocks\\$\F_{p^2}$} & {BabyBear\\$\F_{p^4}$} & {Plonky3\\B. $\F_{p^4}$} & {Plonky3-Par\\B. $\F_{p^4}$} & {MamaBear $\F_{p^3}$} & & {MamaBear-Par $\F_{p^3}$} & \\
+& & & & & Time & {M.\ vs.\ G./B./P.} & Time & {M.\ vs.\ G./B./P.} \\
+\midrule
+18 & 2.07 s & 1.82 s & 1.82 s & 0.33 s & 0.10 s & 21x/18x/18x & 49.1 ms & 42x/37x/7x \\
+19 & 4.34 s & 3.88 s & 3.66 s & 0.67 s & 0.26 s & 17x/15x/14x & 97.3 ms & 45x/40x/7x \\
+20 & 8.84 s & 8.07 s & 7.47 s & 1.35 s & 0.52 s & 17x/16x/14x & 0.20 s & 44x/40x/7x \\
+21 & 18.61 s & 16.60 s & 15.48 s & 2.64 s & 1.14 s & 16x/15x/14x & 0.44 s & 42x/38x/6x \\
+22 & 37.30 s & 33.86 s & 30.27 s & 5.84 s & 2.72 s & 14x/12x/11x & 0.96 s & 39x/35x/6x \\
+23 & 75.49 s & 68.64 s & 61.86 s & 11.82 s & 6.37 s & 12x/11x/10x & 1.98 s & 38x/35x/6x \\
+24 & 152.8 s & 138.0 s & 128.3 s & 27.20 s & 14.37 s & 11x/10x/9x & 4.14 s & 37x/33x/7x \\
+25 & -- & -- & -- & -- & 31.76 s & --/--/-- & 8.71 s & --/--/-- \\
+26 & -- & -- & -- & -- & 68.77 s & --/--/-- & 19.10 s & --/--/-- \\
+27 & -- & -- & -- & -- & 144.1 s & --/--/-- & -- & --/--/-- \\
+\bottomrule
+\end{tblr}
+\end{table*}
+%\end{noIndentBlock}
+\clearpage
+% paper Table 9
+\setcounter{table}{8}
+\begin{table}[t]
+\centering
+\caption{Field arithmetic microbenchmark: time (ms) for $10^8$ operations on the $\F_{p^d}$ extension used by each backend (configuration matches Table~\ref{tab:eval-config}). For our MamaBear addition we report the $\mathsf{lazy\_add}()$ variant from \S\ref{sec:lazy-reduction}. ``M.\ vs.\ G./B./P.'' is the MamaBear speedup over Goldilocks / BabyBear / Plonky3.}
+\label{tab:field-bench}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[1.4,c,m]},
+  row{1} = {font=\bfseries}, rowsep = 1.5pt,
+}
+\toprule
+Op & Gold. & Baby. & Plonky3 & MamaBear & {M.\ vs.\ G./B./P.} \\
+\midrule
+Add & 52.88 & 21.65 & 5.75 & 2.27 & 23.3x/9.5x/2.5x \\
+Mul & 367.40 & 341.00 & 82.78 & 67.92 & 5.4x/5.0x/1.2x \\
+reduce\_fast & -- & -- & -- & 6.87 & -- \\
+\bottomrule
+\end{tblr}
+\end{table}
+\clearpage
+% paper Table 10
+\setcounter{table}{9}
+\begin{table}[H]
+\centering
+\caption{Representative circuit sizes.}
+\label{tab:circuit-size}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {X[l,m] X[c,m] X[c,m]},
+  row{1} = {font=\bfseries},
+}
+\toprule
+Primitive & Operation & Circuit Size \\
+\midrule
+SHA256 & 1 block & $2^{18.20}$ \\
+AES128 & 1 call & $2^{16.42}$ \\
+BLAKE3 & 1 permutation & $2^{17.19}$ \\
+Keccak-f[1600] & 1 permutation & $2^{19.16}$ \\
+Poseidon2 & 1 permutation & $2^{12.38}$ \\
+\bottomrule
+\end{tblr}
+\end{table}
+\clearpage
+% paper Table 11
+\setcounter{table}{10}
+\begin{table}[H]
+\centering
+\caption{HyperPlonk--DeepFold proof size (in KiB) across circuit sizes $2^{\mu}$ for $\mu = 18$ to $27$. The MamaBear configuration uses the 5-level FFT split described in \S\ref{sec:split-analysis}. ``-'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:hp-df-proof-size}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+  row{1} = {font=\bfseries}, rowsep = 1.5pt,
+}
+\toprule
+$\mu$ & Goldilocks & BabyBear & Plonky3 & MamaBear & {M.\ vs.\ G.} \\
+\midrule
+18 & 395.11 & 389.43 & 722.88 & 442.87 & +12.1\% \\
+19 & 447.72 & 441.07 & 793.58 & 475.82 & +6.3\% \\
+20 & 498.41 & 489.98 & 867.83 & 514.99 & +3.3\% \\
+21 & 565.80 & 552.34 & 945.07 & 549.26 & -2.9\% \\
+22 & 620.20 & 624.84 & 1025.42 & 600.92 & -3.1\% \\
+23 & 687.34 & 685.85 & 1109.15 & 654.54 & -4.8\% \\
+24 & 756.78 & 753.73 & 1196.36 & 688.51 & -9.0\% \\
+25 & -- & -- & -- & 747.54 & -- \\
+26 & -- & -- & -- & 792.62 & -- \\
+27 & -- & -- & -- & 848.94 & -- \\
+\bottomrule
+\end{tblr}
+\end{table}
+\clearpage
+% paper Table 12
+\setcounter{table}{11}
+%\begin{noIndentBlock}
+\begin{table*}[t]
+\centering
+\caption{HyperPlonk--DeepFold prover time across circuit sizes $2^{\mu}$ for $\mu = 18$ to $27$. Goldilocks, BabyBear, and Plonky3 serve as baselines. ``M.\ vs.\ G./B./P.'' reports the MamaBear speedup over Goldilocks / BabyBear / Plonky3. ``-Par'' columns use 8 threads. Our MamaBear implementations use 3-level splitting FFT. ``-'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:hp-df-prove-prov128-s3}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+  row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+  cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m}, cell{1}{4} = {r=2}{c,m}, cell{1}{5} = {r=2}{c,m},
+  cell{1}{6} = {c=2}{c,m}, cell{1}{8} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & {Goldilocks\\$\F_{p^2}$} & {BabyBear\\$\F_{p^4}$} & {Plonky3\\B. $\F_{p^4}$} & {Plonky3-Par\\B. $\F_{p^4}$} & {MamaBear $\F_{p^3}$} & & {MamaBear-Par $\F_{p^3}$} & \\
+& & & & & Time & {M.\ vs.\ G./B./P.} & Time & {M.\ vs.\ G./B./P.} \\
+\midrule
+18 & 2.07 s & 1.82 s & 1.82 s & 0.33 s & 0.13 s & 16x/14x/14x & 53.1 ms & 39x/34x/6x \\
+19 & 4.34 s & 3.88 s & 3.66 s & 0.67 s & 0.28 s & 16x/14x/13x & 0.11 s & 39x/35x/6x \\
+20 & 8.84 s & 8.07 s & 7.47 s & 1.35 s & 0.64 s & 14x/13x/12x & 0.23 s & 38x/35x/6x \\
+21 & 18.61 s & 16.60 s & 15.48 s & 2.64 s & 1.36 s & 14x/12x/11x & 0.52 s & 36x/32x/5x \\
+22 & 37.30 s & 33.86 s & 30.27 s & 5.84 s & 3.51 s & 11x/10x/9x & 1.11 s & 34x/31x/5x \\
+23 & 75.49 s & 68.64 s & 61.86 s & 11.82 s & 7.96 s & 9x/9x/8x & 2.36 s & 32x/29x/5x \\
+24 & 152.8 s & 138.0 s & 128.3 s & 27.20 s & 17.25 s & 9x/8x/7x & 5.09 s & 30x/27x/5x \\
+25 & -- & -- & -- & -- & 37.68 s & --/--/-- & 11.41 s & --/--/-- \\
+26 & -- & -- & -- & -- & 81.48 s & --/--/-- & 24.05 s & --/--/-- \\
+27 & -- & -- & -- & -- & -- & --/--/-- & -- & --/--/-- \\
+\bottomrule
+\end{tblr}
+\end{table*}
+%\end{noIndentBlock}
+\clearpage
+% paper Table 13
+\setcounter{table}{12}
+\begin{table}[H]
+\centering
+\caption{HyperPlonk--DeepFold proof size (in KiB) across circuit sizes $2^{\mu}$ for $\mu = 18$ to $27$. The MamaBear configuration uses the 3-level FFT split described in \S\ref{sec:split-analysis}. ``-'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:hp-df-proof-size-s3}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[c,m]},
+  row{1} = {font=\bfseries}, rowsep = 1.5pt,
+}
+\toprule
+$\mu$ & Goldilocks & BabyBear & Plonky3 & MamaBear & {M.\ vs.\ G.} \\
+\midrule
+18 & 395.11 & 389.43 & 722.88 & 312.13 & -21.0\% \\
+19 & 447.72 & 441.07 & 793.58 & 344.33 & -23.1\% \\
+20 & 498.41 & 489.98 & 867.83 & 388.73 & -22.0\% \\
+21 & 565.80 & 552.34 & 945.07 & 428.80 & -24.2\% \\
+22 & 620.20 & 624.84 & 1025.42 & 484.25 & -21.9\% \\
+23 & 687.34 & 685.85 & 1109.15 & 529.12 & -23.0\% \\
+24 & 756.78 & 753.73 & 1196.36 & 590.07 & -22.0\% \\
+25 & -- & -- & -- & 645.42 & -- \\
+26 & -- & -- & -- & 699.30 & -- \\
+27 & -- & -- & -- & 774.31 & -- \\
+\bottomrule
+\end{tblr}
+\end{table}
+\clearpage
+% paper Table 14
+\setcounter{table}{13}
+\begin{table}[H]
+\centering
+\caption{HyperPlonk--DeepFold prover peak memory (in GiB) across circuit sizes $2^{\mu}$ for $\mu = 18$ to $27$. ``M.\ vs.\ G./B./P.'' reports the MamaBear memory reduction factor over Goldilocks / BabyBear / Plonky3. The MamaBear configuration uses the 5-level FFT split described in \S\ref{sec:split-analysis}. ``-'' indicates data not reported due to out-of-memory (OOM).}
+\label{tab:hp-df-peak-memory}
+\small
+\begin{tblr}{
+  width = \linewidth,
+  colspec = {Q[c,m] X[c,m] X[c,m] X[c,m] X[c,m] X[1.35,c,m] X[c,m] X[1.35,c,m]},
+    row{1} = {font=\bfseries}, row{2} = {font=\bfseries}, rowsep = 1.5pt,
+    cell{1}{1} = {r=2}{c,m}, cell{1}{2} = {r=2}{c,m}, cell{1}{3} = {r=2}{c,m}, cell{1}{4} = {r=2}{c,m},
+    cell{1}{5} = {c=2}{c,m}, cell{1}{7} = {c=2}{c,m},
+}
+\toprule
+$\mu$ & Gold. & Baby. & Plonky3 & MamaBear & & MamaBear-Par & \\
+& & & & Mem. & {M.\ vs.\ G./B./P.} & Mem. & {M.\ vs.\ G./B./P.} \\
+\midrule
+18 & 0.56 & 0.52 & 0.72 & 0.13 & 4x/4x/6x & 0.17 & 3x/3x/4x \\
+19 & 1.11 & 1.03 & 1.44 & 0.25 & 4x/4x/6x & 0.33 & 3x/3x/4x \\
+20 & 2.23 & 2.06 & 2.87 & 0.50 & 4x/4x/6x & 0.66 & 3x/3x/4x \\
+21 & 4.45 & 4.12 & 5.74 & 1.00 & 4x/4x/6x & 1.32 & 3x/3x/4x \\
+22 & 8.91 & 8.24 & 11.47 & 2.00 & 4x/4x/6x & 2.66 & 3x/3x/4x \\
+23 & 17.81 & 16.47 & 22.94 & 4.00 & 4x/4x/6x & 5.31 & 3x/3x/4x \\
+24 & 35.63 & 32.94 & 45.88 & 8.00 & 4x/4x/6x & 10.63 & 3x/3x/4x \\
+25 & -- & -- & -- & 16.00 & --/--/-- & 21.25 & --/--/-- \\
+26 & -- & -- & -- & 32.00 & --/--/-- & 42.50 & --/--/-- \\
+27 & -- & -- & -- & 64.00 & --/--/-- & 85.00 & --/--/-- \\
+\bottomrule
+\end{tblr}
+\end{table}
+
+\end{document}

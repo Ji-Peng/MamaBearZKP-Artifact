@@ -1,0 +1,55 @@
+# ==== reproduce_p3_rand.sh run ====
+# timestamp:  2026-07-26T00:00:00+08:00
+# cpu:        AMD EPYC 9B45
+# memory:     123Gi
+# cores:      8 physical, 16 logical
+# os:         Ubuntu 24.04.3 LTS
+# kernel:     Linux 6.17.0-1021-gcp #24~24.04.1-Ubuntu SMP Tue Jul  7 14:58:58 UTC 2026
+# rustc:      rustc 1.98.0-nightly (c397dae80 2026-07-02)
+# git:        unknown (no git metadata)
+# args:       peak_memory
+# ---- harness ----
+# warmup:     1
+# samples:    5 (median of the sorted samples)
+# rayon:      RAYON_NUM_THREADS=8
+# ============================
+# Plonky3 degree-3 random-gate AIR baseline (--objective hyper-plonk-gate)
+# plonky3:  0f87f2b543a0 + plonky3-benchmark.patch + plonky3-rand-circuit.patch
+# config:   --field baby-bear --security prov128 (default degree-4 BabyBear extension)
+# nv:       18..24   threads(par)=8
+# note:     extension degree 4 gives a ~124-bit challenge field.
+# estimator: serial = median of BENCH_SAMPLES samples in one process;
+#            par    = MINIMUM over BENCH_PAR_REPS processes (1 warmup + 1
+#            sample each). Parallel timings on this host vary between
+#            processes rather than within one, so a within-process median
+#            reports whichever cluster that process landed in. The MamaBear
+#            column this is compared against is estimated the same way.
+#
+Plonky3 BabyBear RAND prov128 prove NV=18                               0.718 GiB
+Plonky3 BabyBear RAND prov128 verify NV=18                            159.040 MiB
+Plonky3 BabyBear RAND prov128 prove NV=19                               1.435 GiB
+Plonky3 BabyBear RAND prov128 verify NV=19                            317.134 MiB
+Plonky3 BabyBear RAND prov128 prove NV=20                               2.868 GiB
+Plonky3 BabyBear RAND prov128 verify NV=20                            633.228 MiB
+Plonky3 BabyBear RAND prov128 prove NV=21                               5.736 GiB
+Plonky3 BabyBear RAND prov128 verify NV=21                           1265.322 MiB
+Plonky3 BabyBear RAND prov128 prove NV=22                              11.470 GiB
+Plonky3 BabyBear RAND prov128 verify NV=22                           2529.416 MiB
+Plonky3 BabyBear RAND prov128 prove NV=23                              22.939 GiB
+Plonky3 BabyBear RAND prov128 verify NV=23                           5057.510 MiB
+Plonky3 BabyBear RAND prov128 prove NV=24                              45.877 GiB
+Plonky3 BabyBear RAND prov128 verify NV=24                          10113.604 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=18                           0.718 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=18                        159.099 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=19                           1.435 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=19                        317.193 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=20                           2.868 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=20                        633.287 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=21                           5.736 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=21                       1265.381 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=22                          11.470 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=22                       2529.475 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=23                          22.939 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=23                       5057.569 MiB
+Plonky3 BabyBear RAND prov128 prove_par NV=24                          45.877 GiB
+Plonky3 BabyBear RAND prov128 verify_par NV=24                      10113.663 MiB
