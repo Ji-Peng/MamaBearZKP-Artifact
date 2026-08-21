@@ -9,10 +9,20 @@
 //!   - `CONJ96` — conjectured 96-bit soundness (this one IS a total).
 //!   - `PROV_QUERY97` / `PROV_QUERY128` — provable soundness on the QUERY path
 //!     only, i.e. `S_query`, NOT the total provable figure. See the ledger
-//!     below: the total is `S_prov = min(C, S_query)` and for MamaBear Ext3 the
-//!     commit term C BINDS at ~81-83. These were named `PROV97` / `PROV128`
-//!     until 2026-07-17; that name read as "provable 128-bit" and misled at
-//!     least one reader (see HISTORY below), hence the explicit `_QUERY`.
+//!     below: the total is `S_prov = min(C, S_query)`, and for MamaBear Ext3 it
+//!     is the commit term C that BINDS, at **107.6 / 106.5** for nv = 19 / 20.
+//!     These were named `PROV97` / `PROV128` until 2026-07-17; that name read
+//!     as "provable 128-bit" and misled at least one reader (see HISTORY
+//!     below), hence the explicit `_QUERY`.
+//!
+//!     SUPERSEDED: this line previously read "C BINDS at ~81-83", which is the
+//!     figure from the older `O(n^2)` bad-challenge count and contradicted the
+//!     ledger table further down in this same file. The commit term is now
+//!     taken from the linear-in-`n` proximity gap inside the Johnson radius,
+//!     which is worth `log2(n) + 2.61` bits; `81-83` must not be quoted. An
+//!     external reviewer read the stale line and correctly flagged it against
+//!     the table, which is what prompted this correction — a header summarizing
+//!     a table is exactly the place a superseded number survives longest.
 //!   - `GRINDING_BITS_EXT3_PROV_QUERY128` (MamaBear only) — PoW grinding bits
 //!     (zeta_q) added to the query path.
 //!
