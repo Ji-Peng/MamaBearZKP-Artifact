@@ -33,7 +33,22 @@ pub trait LazyReduction: Sized + Copy {
     fn lazy_sub(self, rhs: Self) -> Self;
     /// Conditional subtraction of x*P. This is useful when you don't want to perform reduction.
     fn con_sub_xp(self, x: u8) -> Self;
-    /// Fast reduction, utilizing the sparsity property of the modulus: 2^49 = 2^34 - 1
+    /// Fast reduction, utilizing the sparsity of the modulus: `2^49 ≡ 2^34 - 1
+    /// (mod P)`, so `x = x_lo + 2^49 * x_hi` folds to `x_lo + (2^34 - 1) * x_hi`
+    /// in two shifts and a subtract.
+    ///
+    /// RANGE, stated exactly because it is *not* `[0, 2P)`: for an arbitrary
+    /// `u64` input the image is `[0, 2^50 - 2^34 - 2^15]`, whose top element is
+    /// `2P + (2^34 - 2^15 - 1)` — i.e. `reduce_fast` DOES exceed `2P`, though
+    /// only for inputs `>= 2^64 - 2^49` (equivalently `x_hi == 2^15 - 1`, the
+    /// largest possible high part). The bound honoured everywhere in this file
+    /// is therefore `[0, 2.0001P)`, and `[0, 2^50)` is the convenient slack
+    /// form of it. Any comment claiming `reduce_fast -> [0, 2P)` is wrong at
+    /// the very top of the `u64` range; write `[0, 2^50)` instead.
+    ///
+    /// The `reduce_2p` / `reduce` ladder below is unaffected: one conditional
+    /// subtraction of `P` maps `[0, 2P + P)` into `[0, 2P)`, and a second maps
+    /// it into `[0, P)`, so both remain exact.
     fn reduce_fast(self) -> Self;
     /// Reduction to [0, 2p).
     fn reduce_2p(self) -> Self;
@@ -144,7 +159,22 @@ impl Neg for MamaBearScalar {
 }
 impl Add for MamaBearScalar {
     type Output = Self;
-    /// Modular add: (self + rhs) con_sub_xp(1). Matches PackedMamaBearAVX512::add exactly.
+    /// Modular add: `(self + rhs).con_sub_xp(1)`. Matches
+    /// `PackedMamaBearAVX512::add` exactly, which is why it is a single
+    /// conditional subtraction rather than a full reduction.
+    ///
+    /// RANGE, and this is the asymmetry to watch: `Sub` and `Neg` accept
+    /// non-canonical operands in `[0, 2P)` and return CANONICAL results, but
+    /// `Add` does NOT preserve `[0, 2P)` — one `con_sub_xp(1)` on a sum in
+    /// `[0, 4P)` only guarantees `[0, 3P)`. So `a + b` on two `[0, 2P)`
+    /// operands can land at or above `2P`, and feeding that straight into `Neg`
+    /// (or into `Sub` on either side) leaves the `2P` window those two require:
+    /// their `wrapping_sub` then contributes `2^64`, which is not a multiple of
+    /// `P` (`2^64 mod P = 2^34 - 2^15 - 1`), so the result is not congruent to
+    /// the intended value at all. Canonical operands are fine — `a, b < P`
+    /// gives a sum `< 2P` and hence a canonical result — the hazard is only for
+    /// values arriving from a lazy chain. Insert `reduce_2p()` before negating
+    /// or subtracting with the output of a chain of `Add`s.
     #[inline(always)]
     fn add(self, rhs: Self) -> Self {
         let sum = self.0.wrapping_add(rhs.0);
@@ -205,6 +235,23 @@ impl Field for MamaBearScalar {
     fn is_zero(&self) -> bool {
         self.0 == 0
     }
+    /// The RAW (non-Montgomery) representative of 1 — NOT the identity of
+    /// [`Mul`], which is Montgomery multiplication.
+    ///
+    /// This type's `u64` payload carries a Montgomery representative in the hot
+    /// paths (`R = 2^52`), but `zero`/`one`/`random`/`inv_2` all produce RAW
+    /// values, and the convention of which domain a given value lives in is
+    /// carried by the call site, not by the type. The consequence is that this
+    /// `Field` impl is NOT a lawful ring: `one() * x == mont_mul(1, x) ==
+    /// x * R^{-1} mod P`, which differs from `x` for every nonzero canonical
+    /// `x`. The multiplicative identity of `Mul` is `R mod P`.
+    ///
+    /// Every call site that needs a `Mul` identity must therefore write
+    /// `Field::one().to_montgomery()` (or seed with `R mod P` directly, as
+    /// [`Field::exp`] does). That obligation is enforced by review, not by the
+    /// type system; see the `Radix2Group` note further down for a generic
+    /// helper this rules out. Do not "simplify" a `one().to_montgomery()` to a
+    /// bare `one()`.
     fn one() -> Self {
         Self(1)
     }
@@ -254,12 +301,54 @@ impl Field for MamaBearScalar {
     fn reduce_mod_p(self) -> Self {
         <Self as LazyReduction>::reduce(self)
     }
+    /// Draw a field element from transcript bytes: one little-endian `u64`
+    /// reduced mod `P`.
+    ///
+    /// BIAS, stated because a modular reduction of a power-of-two range is
+    /// never exactly uniform: writing `2^64 = qP + r`, the total-variation
+    /// distance from uniform is `r(P - r)/(2^64 P)`. Here
+    /// `r = 2^64 mod P = 2^34 - 2^15 - 1`, which sits unusually high for a
+    /// 49-bit modulus because `P = 2^49 - 2^34 + 1` is Solinas, giving
+    /// TV ~ `2^-30.0` per component. That is nonzero but far below any
+    /// soundness threshold this system claims, and it accumulates only
+    /// linearly in the number of challenges drawn per proof.
+    ///
+    /// Widening the draw is the clean fix — reducing a 512-bit integer instead
+    /// of a 64-bit one takes the per-component TV to about `2^-465` — but it
+    /// moves every challenge value and hence every proof byte, so it is not
+    /// applied on this artifact branch, whose recorded measurements are pinned
+    /// to these exact bytes.
     fn from_uniform_bytes(b: &[u8; 32]) -> Self {
         let mut arr = [0u8; 8];
         arr.copy_from_slice(&b[0..8]);
         Self(u64::from_le_bytes(arr) % P)
     }
+    /// Emit the low 7 bytes (56 bits) — the transcript / Merkle-leaf wire form.
+    ///
+    /// CONTRACT: `self` must be CANONICAL (`< P`). The format is injective on
+    /// canonical values (`P < 2^49 < 2^56`) but not on the whole `u64`: the low
+    /// 56 bits are kept and everything above is discarded, so e.g. `0` and
+    /// `2^56` serialize identically. Serializing an unreduced accumulator would
+    /// therefore weaken transcript BINDING, not merely canonicity — two
+    /// distinct claimed values could hash to the same transcript bytes.
+    ///
+    /// Enforced by `debug_assert` rather than by an unconditional `reduce()`:
+    /// this sits on the FRI Merkle-leaf hot path, and MamaBear's UNSIGNED
+    /// representation makes canonicity a maintainable invariant of the callers.
+    /// A field backend using a SIGNED representation could not rely on that —
+    /// there `x` and `x - p` are both valid reps, so no caller-side invariant
+    /// establishes uniqueness and the boundary must canonicalize itself.
+    /// The invariant here was checked empirically by promoting this to a hard
+    /// `assert` and running the end-to-end SNARK prove/verify suite, which
+    /// reported zero violations.
     fn serialize_into(&self, buffer: &mut [u8]) {
+        debug_assert!(
+            self.0 < P,
+            "MamaBearScalar::serialize_into on a non-canonical value ({}): the \
+             7-byte wire format keeps only the low 56 bits and is injective on \
+             [0, P) only — reduce() before crossing the byte boundary",
+            self.0
+        );
         buffer[0..7].copy_from_slice(&self.0.to_le_bytes()[..7]);
     }
     fn deserialize_from(b: &[u8]) -> Self {
@@ -461,11 +550,36 @@ impl Mul for MamaBearScalarExt3 {
     ///   c1 = v01 + v12 + v2
     ///   c2 = v02 + v1 + v2
     ///
-    /// # Range Analysis (unsigned, R=2^52)
-    /// Inputs per component: [0, 4P) ≈ [0, 2^51)
-    /// Products: mont_mul → [0, 3P) (m=16)
-    /// Cross terms vij = sij + 4P - vi - vj: [0, 7P) after lazy ops
-    /// Final: add + reduce_fast → [0, 2P)
+    /// # Range Analysis (unsigned, R = 2^52)
+    ///
+    /// Inputs per component: `[0, 4P)`, i.e. just under `2^51`. The pairwise
+    /// `lazy_add`s below then reach `8P < 2^52`, which is the real ceiling —
+    /// `mont_mul`'s `a*b` must stay inside `u128` and, in the packed twin, each
+    /// operand must fit the 52-bit `madd52` window.
+    ///
+    /// `mont_mul(x, y) = floor(xy/R) + P - floor(mP/R)` with `m < R`, so it is
+    /// bounded above by `xy/R + P` and below by `floor(xy/R)`. Hence:
+    ///
+    /// - `v0, v1, v2` (operands `< 4P`): `< 16P^2/R + P = 3P`.
+    /// - `s01, s02, s12` (operands `< 8P`): `< 64P^2/R + P = 9P` — NOT `3P`.
+    ///   The `3P` figure applies only to operands `< 4P`, and the `sij` inputs
+    ///   are sums of two components.
+    /// - `vij = sij + 4P - vi - vj`: upper bound `9P + 4P = 13P`, not `7P`.
+    /// - `c0 = v0 + v12 < 16P`; `c1 = v01 + v12 + v2 < 29P`;
+    ///   `c2 = v02 + v1 + v2 < 19P`. All are far under `2^64` (`29P < 2^54.9`),
+    ///   so no accumulator wraps.
+    /// - `reduce_fast` on any `u64` lands in `[0, 2^50)` — see the note on
+    ///   `LazyReduction::reduce_fast`; it is `[0, 2.0001P)`, NOT `[0, 2P)`.
+    ///
+    /// WHY THE `+4P` CANNOT UNDERFLOW, which is the one step a worst-case bound
+    /// gets wrong: naively `vi + vj` reaches `6P`, so `+4P` looks insufficient.
+    /// It is sufficient because `sij` and `vi + vj` are correlated, not
+    /// independent. With `x = a_i + a_j` and `y = b_i + b_j` we have
+    /// `xy >= a_i b_i + a_j b_j`, so
+    /// `sij >= floor(xy/R) >= floor(a_i b_i/R) + floor(a_j b_j/R)`, while
+    /// `vi <= floor(a_i b_i/R) + P` and likewise for `vj`. Therefore
+    /// `sij + 4P - vi - vj >= 2P > 0`. Any future edit that changes which
+    /// products are subtracted must redo THIS argument, not the worst-case one.
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self {
         let v0 = self.c0 * rhs.c0;
@@ -476,17 +590,20 @@ impl Mul for MamaBearScalarExt3 {
         let s02 = self.c0.lazy_add(self.c2) * rhs.c0.lazy_add(rhs.c2);
         let s12 = self.c1.lazy_add(self.c2) * rhs.c1.lazy_add(rhs.c2);
 
-        // Add 4P before subtracting to prevent unsigned underflow
-        // v12 = s12 + 4P - v1 - v2, in [0, 7P)
+        // Add 4P before subtracting to prevent unsigned underflow. 4P suffices
+        // by the correlation argument in the doc comment (sij >= floor(a_i b_i/R)
+        // + floor(a_j b_j/R) while vi + vj <= that + 2P), NOT because vi + vj
+        // happens to be small — worst-case it reaches 6P.
+        // v12 = s12 + 4P - v1 - v2, in [2P, 13P)
         let v12 = s12.lazy_add_xp(4).lazy_sub(v1).lazy_sub(v2);
         let v01 = s01.lazy_add_xp(4).lazy_sub(v0).lazy_sub(v1);
         let v02 = s02.lazy_add_xp(4).lazy_sub(v0).lazy_sub(v2);
 
-        // c0 = v0 + v12, in [0, 10P) → reduce_fast → [0, 2P)
+        // c0 = v0 + v12, in [0, 16P) → reduce_fast → [0, 2^50)
         let c0 = v0.lazy_add(v12).reduce_fast();
-        // c1 = v01 + v12 + v2, in [0, 17P) → reduce_fast → [0, 2P)
+        // c1 = v01 + v12 + v2, in [0, 29P) → reduce_fast → [0, 2^50)
         let c1 = v01.lazy_add(v12).lazy_add(v2).reduce_fast();
-        // c2 = v02 + v1 + v2, in [0, 13P) → reduce_fast → [0, 2P)
+        // c2 = v02 + v1 + v2, in [0, 19P) → reduce_fast → [0, 2^50)
         let c2 = v02.lazy_add(v1).lazy_add(v2).reduce_fast();
 
         Self { c0, c1, c2 }
@@ -1322,40 +1439,62 @@ impl Mul for PackedMamaBearAVX512Ext3 {
     ///   c2 = v02 + v1 + v2
     ///
     /// # Range Analysis
-    /// Inputs: components ∈ [0, 2^51 ≈ 4P)
-    /// v0, v1, v2 (inputs ∈ [0, 2P)): output ∈ [0, 1.5P)
-    /// s01, s02, s12 (inputs ∈ [0, 4P)): output ∈ [0, 3P)
     ///
-    /// c0 = v0 + s12 + 4P - v1 - v2:  [P, 8.5P) — fits u64
-    /// c1 = s01 + s12 + 8P - v0 - 2*v1: [3.5P, 14P) — fits u64
-    /// c2 = s02 + v1 + 4P - v0:       [2.5P, 8.5P) — fits u64
+    /// Input contract: every component `< 2^51` (just over `4P`). The pairwise
+    /// `lazy_add`s below reach `2^52`, which is the hard ceiling — that is the
+    /// widest operand `madd52` reads without silently dropping high bits.
     ///
-    /// Output after reduce_fast: [0, 2.0001P)
+    /// `mont_mul(x, y)` is bounded above by `xy/R + P` and below by
+    /// `floor(xy/R)`, so at this contract:
+    ///
+    /// - `v0, v1, v2` (operands `< 4P`): `< 3P`.
+    /// - `s01, s02, s12` (operands `< 8P`): `< 9P`.
+    /// - `c0 = v0 + s12 + 4P - v1 - v2`: `[2P, 16P)`.
+    /// - `c1 = s01 + s12 + 8P - v0 - 2*v1`: `[4P, 26P)`.
+    /// - `c2 = s02 + v1 + 4P - v0`: `[2P, 16P)`.
+    /// - `reduce_fast` on any `u64`: `[0, 2^50)`, i.e. `[0, 2.0001P)`.
+    ///
+    /// Every intermediate fits `u64` with room to spare (`26P < 2^54.7`), and
+    /// each expression is evaluated additions-first, so no partial sum dips
+    /// below zero either.
+    ///
+    /// The lower bounds need the SAME correlation argument as the scalar twin,
+    /// because a worst-case bound makes the `+4P` look insufficient (`vi + vj`
+    /// reaches `6P`). With `x = a_i + a_j`, `y = b_i + b_j` we have
+    /// `xy >= a_i b_i + a_j b_j`, hence
+    /// `sij >= floor(a_i b_i/R) + floor(a_j b_j/R) >= vi + vj - 2P`, so each
+    /// `sij + 4P - vi - vj >= 2P`. Regrouping gives the three bounds above.
+    ///
+    /// HISTORY: this block previously read `v* < 1.5P`, `s* < 3P` and
+    /// `c* < 14P`. Those are the figures for a `[0, 2P)` input contract and
+    /// contradicted this block's own first line; the code is correct over the
+    /// full `2^51` window, the arithmetic quoted for it was not.
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self {
         // 6 base field multiplications
-        let v0 = self.c0 * rhs.c0;                                        // [0, 1.5P)
-        let v1 = self.c1 * rhs.c1;                                        // [0, 1.5P)
-        let v2 = self.c2 * rhs.c2;                                        // [0, 1.5P)
-        let s01 = self.c0.lazy_add(self.c1) * rhs.c0.lazy_add(rhs.c1);    // [0, 3P)
-        let s02 = self.c0.lazy_add(self.c2) * rhs.c0.lazy_add(rhs.c2);    // [0, 3P)
-        let s12 = self.c1.lazy_add(self.c2) * rhs.c1.lazy_add(rhs.c2);    // [0, 3P)
+        let v0 = self.c0 * rhs.c0;                                        // [0, 3P)
+        let v1 = self.c1 * rhs.c1;                                        // [0, 3P)
+        let v2 = self.c2 * rhs.c2;                                        // [0, 3P)
+        let s01 = self.c0.lazy_add(self.c1) * rhs.c0.lazy_add(rhs.c1);    // [0, 9P)
+        let s02 = self.c0.lazy_add(self.c2) * rhs.c0.lazy_add(rhs.c2);    // [0, 9P)
+        let s12 = self.c1.lazy_add(self.c2) * rhs.c1.lazy_add(rhs.c2);    // [0, 9P)
 
         let p4 = PackedMamaBearAVX512::broadcast(4 * P);
         let p8 = PackedMamaBearAVX512::broadcast(8 * P);
 
         // c0 = v0 + (s12 - v1 - v2)  = v0 + s12 + 4P - v1 - v2
-        // range: [0 + 0 + 4P - 1.5P - 1.5P, 1.5P + 3P + 4P - 0 - 0) = [P, 8.5P)
+        // range: [2P, 3P + 9P + 4P) = [2P, 16P); the lower bound is the
+        // correlation argument in the doc comment, not 4P - max(v1 + v2).
         let c0 = v0.lazy_add(s12).lazy_add(p4).lazy_sub(v1).lazy_sub(v2).reduce_fast();
 
         // c1 = (s01 - v0 - v1) + (s12 - v1 - v2) + v2
         //    = s01 + s12 + 8P - v0 - 2*v1
-        // range: [0 + 0 + 8P - 1.5P - 3P, 3P + 3P + 8P - 0 - 0) = [3.5P, 14P)
+        // range: [4P, 9P + 9P + 8P) = [4P, 26P)
         let c1 = s01.lazy_add(s12).lazy_add(p8).lazy_sub(v0).lazy_sub(v1).lazy_sub(v1).reduce_fast();
 
         // c2 = (s02 - v0 - v2) + v1 + v2
         //    = s02 + v1 + 4P - v0
-        // range: [0 + 0 + 4P - 1.5P, 3P + 1.5P + 4P - 0) = [2.5P, 8.5P)
+        // range: [2P, 9P + 3P + 4P) = [2P, 16P)
         let c2 = s02.lazy_add(v1).lazy_add(p4).lazy_sub(v0).reduce_fast();
 
         Self { c0, c1, c2 }
