@@ -101,6 +101,78 @@
 //! number. For MamaBear the honest full provable figure is
 //! `S_prov = min(C, S_query) = 107.6` at nv=19, and it is COMMIT-bound.
 //!
+//! ## The ledger assumes UNIFORM challenges; the sampler is not exactly uniform
+//!
+//! Every bound above is stated for challenges drawn uniformly from the
+//! extension field. The implemented sampler does not achieve that exactly, and
+//! the gap is small but it is not zero, so it belongs in the ledger rather than
+//! only in the field code.
+//!
+//! `MamaBearScalar::from_uniform_bytes` reduces one little-endian `u64` mod
+//! `P`. Writing `2^64 = qP + r`, residues below `r` get `q+1` preimages and
+//! the rest get `q`. Because `P = 2^49 - 2^34 + 1` is Solinas we have
+//! `r = 2^64 mod P = 2^34 - 2^15 - 1`, so `r/P = 2^-15.00` — large for a
+//! 49-bit prime, and forced by the same sparsity that makes reduction cheap.
+//!
+//! The measure to apply is the POINTWISE probability ratio, not the total
+//! variation distance:
+//!
+//! ```text
+//!   max ratio = 1 + (P-r)/2^64 = 1 + 2^-15.00      <- use this for soundness
+//!   min ratio = 1 -  r   /2^64 = 1 - 2^-30.00
+//!   TV        = r(P-r)/(2^64 P) = 2^-30.000        <- use this ONLY for
+//!                                                     distinguishing claims
+//! ```
+//!
+//! Reading TV additively would say a `2^-100` cheating probability becomes
+//! `2^-30`. That bound is valid and badly loose: the bias is diffuse, so the
+//! multiplicative bound applies instead, and for `k` independent components
+//! `Pr_biased[B] <= (1 + 2^-15)^k Pr_uniform[B]` for every event `B`. The bound
+//! is tight (an adversary whose bad set sits inside `[0, r)` attains it).
+//!
+//! WHICH TERMS OF THIS LEDGER MOVE, and it is not all of them:
+//!
+//! - `S_query` — does NOT move. Query positions come from `challenge_usizes`
+//!   and are reduced `% (fat_domain >> 1)` where `fat_domain = 1 << log_order`;
+//!   a power-of-two modulus is an exact truncation of uniform bytes. Grinding
+//!   is a proof of work over the digest, also not a field draw. So the
+//!   `zeta_q + s * 1.2776` term is exactly as stated.
+//! - `C` — moves. The FRI folding challenges, the batching challenge and the
+//!   out-of-domain `alpha` are all field draws, so the commit-side bound picks
+//!   up the multiplicative factor.
+//!
+//! Measured by instrumenting the transcript over a full prove of the add/mul
+//! SNARK: `nv = 20` draws 315 Ext3 challenges, and each Ext3 draw consumes
+//! THREE base components (bytes 0..8, 8..16, 16..24 of one digest), so
+//! `k = 945` and the factor is `(1 + 2^-15)^945 = 1.0293`, i.e. **0.042 bit**.
+//! The count does not depend on the query count — `query_num` feeds only
+//! `challenge_usizes`, never a `challenge_f` loop — so it applies unchanged at
+//! the shipped 88 queries.
+//!
+//! Charging that nv = 20 budget against the nv = 19 figure OVER-states the loss
+//! (nv = 19 draws fewer challenges), and even so `S_prov = C = 107.6` becomes
+//! 107.558, which still prints as 107.6. No number in this file and no number
+//! under `results/` moves. Reaching a full bit of loss would take about `2^15`
+//! components in one transcript, 35x more than the protocol draws.
+//!
+//! Two caveats worth carrying rather than rediscovering:
+//!
+//! 1. The unit is the COMPONENT, not the draw. Counting the 315 Ext3 draws
+//!    instead of the 945 components under-states the exponent threefold.
+//! 2. The 0.042 bit is a SOUNDNESS figure and depends on this system being a
+//!    succinct argument with no zero-knowledge claim. A distinguishing claim
+//!    needs the additive `k * TV = 945 * 2^-30 = 2^-20.1` instead, which would
+//!    cap statistical indistinguishability far below any `2^-100` target.
+//!    Widen the draw before adding blinding, never after.
+//!
+//! The fix is cheap and is documented at the call site: the function already
+//! receives 32 uniform bytes and consumes 8, so 10 bytes per component still
+//! fits three components in one digest — no extra hashing — and takes the ratio
+//! to `1 + 2^-31`. It is deliberately not applied here, because changing a
+//! challenge value changes the Fiat-Shamir chain, the query indices, the
+//! Merkle-path deduplication and therefore the recorded proof sizes, in
+//! exchange for a fraction of a bit that does not survive rounding.
+//!
 //! The binding side is NOT universal — check it per backend and per nv rather
 //! than assuming. A backend with a LARGER extension field can be QUERY-bound at
 //! the same nv where MamaBear is COMMIT-bound (more queries WOULD lift it), and

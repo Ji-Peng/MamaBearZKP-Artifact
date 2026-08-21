@@ -214,6 +214,28 @@ One exception is the field microbenchmarks: the shipped `results/MamaBear/field.
 
 Every benchmark runs the same FRI regime: **88 queries + 16 grinding bits at code rate 1/8** (`PROV_QUERY128`). The name refers to the query-path target `S_query = 16 + 88 x 1.2776 = 128.4` bits; the total provable level is `min(commit, query)`, and for MamaBear over `F_p^3` it is commit-bound at roughly 106-109 bits over `mu = 18..20`. Each result file's header carries the full derivation, including which of the two bounds binds.
 
+### Challenge sampling
+
+One detail of the Fiat-Shamir implementation is worth stating explicitly, because it is the kind of thing a careful reader will compute for themselves and it looks worse at first glance than it is.
+
+Field challenges are drawn by reducing transcript bytes modulo `P` (`MamaBearScalar::from_uniform_bytes` in `arithmetic/src/field/mamabear.rs`). Reducing a power-of-two range modulo a non-power-of-two is never exactly uniform. Writing `2^64 = qP + r`, the `r` smallest residues get one extra preimage each, and because `P = 2^49 - 2^34 + 1` is a Solinas prime we have `r = 2^64 mod P = 2^34 - 2^15 - 1`, so `r/P = 2^-15`. That is larger than a random prime of this size would give, and it is forced by exactly the sparsity that makes reduction cheap.
+
+The measure that matters for soundness is the pointwise probability ratio, which is `1 + 2^-15` at worst (and `1 - 2^-30` at best -- most residues are essentially exactly uniform). For `k` independent components this composes multiplicatively, so for any event `B`, including "the verifier accepts a false statement":
+
+```
+Pr_biased[B] <= (1 + 2^-15)^k * Pr_uniform[B]
+```
+
+The total variation distance is `2^-30`, but reading that additively gives a valid and badly loose answer -- it would say a `2^-100` cheating probability becomes `2^-30`. The bias here is diffuse rather than concentrated, which is precisely the case where the multiplicative bound is the right one.
+
+Measured by instrumenting the transcript over a full prove: at `mu = 20` the add/mul SNARK draws 315 extension-field challenges, each consuming three base components, so `k = 945` and the factor is `(1 + 2^-15)^945 = 1.0293`. **The total soundness loss is 0.042 bit.** (The count does not depend on the query count -- `query_num` feeds only the query-position draw, never a field-challenge loop -- so this holds at the 88 queries every benchmark here uses.) Charging that `mu = 20` budget against the `mu = 19` provable level of 107.6 bits over-states the loss, since `mu = 19` draws fewer challenges, and even so 107.6 - 0.042 = 107.558 still prints as 107.6. No figure in `results/` or in the paper moves.
+
+What is *not* affected: the FRI query positions carry no bias at all. They are reduced modulo the evaluation-domain size, which is a power of two, so that reduction is an exact truncation. The query-path term `S_query = 128.4` and the grinding are therefore exactly as stated; only the commit-side bound `C` sees biased randomness.
+
+We have deliberately not changed this in the artifact. Widening the draw is cheap -- the function already receives 32 uniform bytes and uses 8, so 10 bytes per component would fit three components in one digest with no extra hashing and take the ratio to `1 + 2^-31`. But changing a challenge *value* changes the Fiat-Shamir chain, hence the query indices, hence Merkle-path deduplication, hence the proof bytes and the recorded proof sizes. An artifact whose job is to reproduce the paper's numbers should not stop reproducing them in exchange for a fraction of a bit that does not survive rounding. The full derivation, including the measured per-`mu` counts, is in the source at `arithmetic/src/field/mamabear.rs` and `util/src/params.rs`.
+
+One caveat if you are adapting this code rather than reproducing it: the 0.042 bit is a *soundness* figure and relies on this system being a succinct argument with no zero-knowledge claim. A distinguishing claim needs the additive `k * TV = 2^-20.1` instead. If you add blinding on top of this sampler, widen the draw first.
+
 ### Individual categories (optional)
 
 **Skip this section if you ran Step 1.** The two commands there already run every category; nothing below is additionally required. It is here only for re-running one table after a failure, or for a partial reproduction on a time budget.

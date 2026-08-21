@@ -301,23 +301,122 @@ impl Field for MamaBearScalar {
     fn reduce_mod_p(self) -> Self {
         <Self as LazyReduction>::reduce(self)
     }
-    /// Draw a field element from transcript bytes: one little-endian `u64`
-    /// reduced mod `P`.
+    /// Draw a base-field element from transcript bytes: the first little-endian
+    /// `u64` of the digest, reduced mod `P`.
     ///
-    /// BIAS, stated because a modular reduction of a power-of-two range is
-    /// never exactly uniform: writing `2^64 = qP + r`, the total-variation
-    /// distance from uniform is `r(P - r)/(2^64 P)`. Here
-    /// `r = 2^64 mod P = 2^34 - 2^15 - 1`, which sits unusually high for a
-    /// 49-bit modulus because `P = 2^49 - 2^34 + 1` is Solinas, giving
-    /// TV ~ `2^-30.0` per component. That is nonzero but far below any
-    /// soundness threshold this system claims, and it accumulates only
-    /// linearly in the number of challenges drawn per proof.
+    /// # The sampling is not exactly uniform, and here is the whole accounting
     ///
-    /// Widening the draw is the clean fix — reducing a 512-bit integer instead
-    /// of a 64-bit one takes the per-component TV to about `2^-465` — but it
-    /// moves every challenge value and hence every proof byte, so it is not
-    /// applied on this artifact branch, whose recorded measurements are pinned
-    /// to these exact bytes.
+    /// Reducing a power-of-two range mod a non-power-of-two `P` never is.
+    /// Write `2^64 = qP + r`. Then each `v` in `[0, r)` has `q + 1` preimages
+    /// under `x -> x mod P` while each `v` in `[r, P)` has only `q`, so the
+    /// low `r` residues are over-represented. For this prime
+    ///
+    /// ```text
+    ///   P = 2^49 - 2^34 + 1 = 562932773552129
+    ///   r = 2^64 mod P      = 2^34 - 2^15 - 1 = 17179836415,   r/P = 2^-15.00
+    /// ```
+    ///
+    /// `r` is large for a 49-bit modulus, and that is not bad luck: `P` is
+    /// SOLINAS, so `2^49 = 2^34 - 1 (mod P)` and therefore
+    /// `2^64 = 2^15 (2^34 - 1) = 2^34 - 2^15 - 1`. A generic prime this size
+    /// would give `r/P` near `2^-15` only by accident; here it is forced by the
+    /// same sparsity that makes `reduce_fast` two shifts and a subtract. The
+    /// property bought for the multiplier is the property paid for here.
+    ///
+    /// ## Two different measures, and using the wrong one gives a wrong answer
+    ///
+    /// The TOTAL VARIATION distance from uniform is
+    /// `TV = r(P - r)/(2^64 P) = 2^-30.000`. Read additively that looks
+    /// alarming: an event with uniform probability `2^-100` gets the bound
+    /// `2^-100 + 2^-30 ~ 2^-30`, i.e. apparently 70 bits of soundness gone.
+    /// That bound is valid and useless. It is loose because the bias here is
+    /// DIFFUSE, not concentrated, and TV cannot see the difference.
+    ///
+    /// The measure that matters for soundness is the POINTWISE probability
+    /// ratio (a Renyi / max-log-ratio bound):
+    ///
+    /// ```text
+    ///   max_v Pr[v] / (1/P) = P(q+1)/2^64 = 1 + (P - r)/2^64 = 1 + 2^-15.00
+    ///   min_v Pr[v] / (1/P) = Pq    /2^64 = 1 -  r     /2^64 = 1 - 2^-30.00
+    /// ```
+    ///
+    /// So EVERY residue's probability is within `1 + 2^-15` of uniform, and the
+    /// downward deviation is a further 15 bits smaller. For `k` independent
+    /// components the joint density ratio is bounded by the product, hence for
+    /// ANY event `B` (in particular "the verifier accepts a false statement"):
+    ///
+    /// ```text
+    ///   Pr_biased[B] <= (1 + 2^-15)^k * Pr_uniform[B]
+    /// ```
+    ///
+    /// The bound is TIGHT — an adversary whose bad set lies entirely inside
+    /// `[0, r)` attains it — so `1 + 2^-15` is the exact constant, not an
+    /// over-estimate. Soundness loss is MULTIPLICATIVE and therefore tiny;
+    /// only a distinguishing (indistinguishability / zero-knowledge) claim
+    /// needs the additive `k * TV`, and this artifact makes no such claim.
+    /// See the note on the Ext3 draw for that distinction spelled out.
+    ///
+    /// ## What it costs this proof system, measured
+    ///
+    /// Every Fiat-Shamir field challenge in the protocol goes through
+    /// `Transcript::challenge_f`, and for `MamaBearScalarExt3` each draw
+    /// consumes THREE base components (bytes 0..8, 8..16, 16..24 of one
+    /// digest), so `k = 3 * draws`. Counted by instrumenting the transcript
+    /// over a full prove of the add/mul SNARK:
+    ///
+    /// ```text
+    ///   nv     ext3 draws / proof     k       (1+2^-15)^k     bits lost
+    ///   10           110             330        1.01012        0.0145
+    ///   14           180             540        1.01662        0.0238
+    ///   18           266             798        1.02465        0.0351
+    ///   20           315             945        1.02926        0.0416
+    /// ```
+    ///
+    /// The count is INDEPENDENT of the query count: `query_num` feeds only
+    /// `challenge_usizes`, never a `challenge_f` loop, so these figures apply
+    /// unchanged at the shipped 88-query configuration. It is driven by nv and
+    /// by the number of sumchecks and FRI rounds.
+    ///
+    /// At the largest instance measured the total soundness loss is 0.042 bit.
+    /// Carrying that same (nv = 20) budget over to the nv = 19 provable level
+    /// of 107.6 bits — which OVER-states the loss, since nv = 19 draws fewer
+    /// challenges — gives 107.6 - 0.042 = 107.558, still printing as 107.6. No
+    /// figure in `util/src/params.rs` or in `results/` moves. Reaching a full
+    /// 1 bit of loss would need about `2^15` components in one transcript, 35x
+    /// more than the protocol draws.
+    ///
+    /// ## What is NOT affected
+    ///
+    /// The FRI QUERY POSITIONS carry no bias at all. They come from
+    /// `Transcript::challenge_usizes` and are reduced by
+    /// `% (fat_domain >> 1)`, and `fat_domain` is an FFT domain of size
+    /// `1 << log_order` — a power-of-two modulus is an exact truncation. So
+    /// the query-path term `S_query = zeta_q + s * 1.2776 = 128.4` is
+    /// untouched, as is the grinding, which is a proof of work over the digest
+    /// rather than a field draw. Only the terms fed by field challenges move:
+    /// the sumcheck / batching / FRI-folding challenges, i.e. the commit-side
+    /// bound `C`. Since this configuration is commit-bound
+    /// (`S_prov = min(C, S_query) = C`), the 0.042 bit lands on the binding
+    /// side — and still does not move the first decimal.
+    ///
+    /// ## Why it is not fixed here
+    ///
+    /// Widening the draw is the clean fix and it is cheap. Note that this
+    /// function already RECEIVES 32 uniform bytes and uses only 8: taking 10
+    /// bytes per component instead of 8 would still fit three components in
+    /// one digest — no extra hashing, identical transcript structure — and
+    /// would take the ratio to `1 + 2^-31.0`, i.e. the loss from 0.042 bit to
+    /// about `2^-21` bit. A 64-byte-per-component draw reaches `2^-465` TV at
+    /// the cost of six digests per Ext3 challenge.
+    ///
+    /// It is deliberately NOT applied on this artifact. Changing a challenge
+    /// VALUE changes the Fiat-Shamir chain, hence the query indices, hence
+    /// Merkle-path deduplication, hence the proof BYTES and the recorded proof
+    /// SIZES — while buying 0.042 bit that does not survive rounding. This
+    /// artifact's job is to reproduce the numbers in the accompanying paper,
+    /// and a binary that no longer produces them is worse than a documented
+    /// and bounded `2^-15` pointwise deviation. The fix belongs in work whose
+    /// measurements have not been published yet.
     fn from_uniform_bytes(b: &[u8; 32]) -> Self {
         let mut arr = [0u8; 8];
         arr.copy_from_slice(&b[0..8]);
@@ -768,6 +867,42 @@ impl Field for MamaBearScalarExt3 {
             c2: <MamaBearScalar as LazyReduction>::reduce(self.c2),
         }
     }
+    /// Draw an Ext3 challenge: THREE base components from one 32-byte digest,
+    /// bytes `0..8`, `8..16`, `16..24`. Bytes `24..32` are discarded.
+    ///
+    /// Each component carries the `1 + 2^-15` pointwise deviation analysed on
+    /// `MamaBearScalar::from_uniform_bytes`; read that note first. Two things
+    /// specific to this packing are worth stating here.
+    ///
+    /// FIRST, the unit of accounting is the COMPONENT, not the draw. One Ext3
+    /// challenge is three biased samples, so an element of this field deviates
+    /// pointwise by up to `(1 + 2^-15)^3 = 1 + 2^-13.4`, and a proof drawing
+    /// `d` Ext3 challenges must be accounted at `k = 3d`. Counting draws
+    /// instead of components under-states the exponent by a factor of three.
+    ///
+    /// SECOND — and this is the distinction that decides whether the bias is
+    /// acceptable — soundness and indistinguishability need DIFFERENT measures
+    /// of the same defect:
+    ///
+    /// ```text
+    ///   soundness  (an event's probability)   multiplicative: (1+2^-15)^k
+    ///   distinguishing (two distributions)    additive:        k * TV
+    /// ```
+    ///
+    /// At nv = 20 (`k = 945`) those are `1.0293`, i.e. 0.042 bit, versus
+    /// `945 * 2^-30 = 2^-20.1`. The second number is nine orders of magnitude
+    /// worse than the first, and it is the RIGHT number for any claim of the
+    /// form "the real transcript is indistinguishable from a simulated one".
+    ///
+    /// This system is a succinct ARGUMENT, not a zero-knowledge one: nothing
+    /// here is blinded, no simulator is claimed, and no statement is hidden,
+    /// so only the multiplicative bound applies and 0.042 bit is the whole
+    /// cost. **That is a property of this configuration and it does not
+    /// transfer.** Bolting a zero-knowledge layer on top of this sampler
+    /// without widening the draw would silently cap statistical
+    /// indistinguishability at about `2^-20`, which would falsify a `2^-100`
+    /// ZK claim while leaving every soundness number in the ledger correct and
+    /// every test green. Widen the draw BEFORE adding blinding, not after.
     fn from_uniform_bytes(b: &[u8; 32]) -> Self {
         let mut arr0 = [0u8; 8];
         let mut arr1 = [0u8; 8];
